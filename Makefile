@@ -12,17 +12,23 @@ FILE = Data/equilatero_norm.txt
 #FILE = Data/four_points.txt # Ok, I obtain only regions of order 2!
 #FILE = Data/hardest_one.txt # OK! The closed regions is completely partitioned in order-2 regions 
 #FILE = Data/hardest_one_perturbated.txt 
+#FILE = Data/Lee_fig2.txt # OK! Since I need exactly all points all regions get fused together and I get no region at all
 #FILE = Data/best_example.txt
-FILE = Data/Lee_fig2.txt # OK! Since I need exactly all points all regions get fused together and I get no region at all
+#FILE = Data/easy_case.txt
 
+# not working, why?
+FILE = Data/hard_case.txt
 
 # I don't know the ground truth for these ones
 #FILE = Data/example_1.txt 
 #FILE = Data/example_2.txt
 #FILE = Data/Lee_fig2_2.txt
 #FILE = Data/Lee_2.txt
-#FILE = Data/degenerate_1.txt # I have no idea how it should even work correctly
 
+# Probably degenerates cases (like cocircular points or collinear points) that I don't know how to handle yet
+#FILE = Data/degenerate_1.txt 
+#FILE = Data/cocircular_degeneration.txt 
+#FILE = Data/degenerate_2.txt 
 
 # Generic flags that are always valid 
 CFLAGS = -std=c++17 -Isrc/MyGAL/include
@@ -30,7 +36,7 @@ LIBS =  -lsfml-graphics -lsfml-window -lsfml-system
 
 # The flags 
 DEBUG_FLAGS = -g -fsanitize=address -fno-omit-frame-pointer
-SRC = src/Main.cpp src/MinKnapsack.cpp src/Point2D.cpp
+SRC = src/Main.cpp src/MinKnapsack.cpp src/Point2D.cpp src/UnionFind.cpp src/Diagram_visualization.cpp
 OUT = myProgram
 
 # Targets

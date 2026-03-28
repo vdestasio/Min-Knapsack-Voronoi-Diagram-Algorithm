@@ -101,3 +101,11 @@ bt
 ```bash
 g++ -g -fno-omit-frame-pointer -IMyGAL/include Main.cpp MinKnapsack.cpp Point2D.cpp -o MyProgram -lsfml-graphics -lsfml-window -lsfml-system; valgrind --track-origins=yes --leak-check=full --show-leak-kinds=all ./MyProgram 
 ```
+
+
+**CGAL comparison**
+g++ main.cpp -lCGAL -lgmp -lmpfr -O3 -std=c++17
+
+./a.out 3
+
+

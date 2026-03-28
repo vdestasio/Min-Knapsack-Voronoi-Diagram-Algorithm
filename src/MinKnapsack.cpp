@@ -5,6 +5,7 @@
 #include "MinKnapsack.h"
 #include "Point2D.h"
 #include "UnionFind.cpp"
+#include "Diagram_visualization.h"
 
 #define CIRCLE_CENTER_EPSILON 1.0e-7
 
@@ -280,7 +281,6 @@ void chooseDirection(Special_vertex* r) {
         }
     }
 }
-
 
 
 int circumcenterInside(size_t& r_index, std::vector<Special_vertex>& L, int E, bool open) {
@@ -616,7 +616,6 @@ void partition(Voronoi::NewDiagram::FacePtr& r_ptr, std::list<Voronoi::NewDiagra
 
 }
 
-
 std::list<Voronoi::NewDiagram::FacePtr> build_minKnapsack(Voronoi::NewDiagram& diagram, std::vector<std::pair<Point2D, double>>& points, double capacity)
 {
 	std::list<Voronoi::NewDiagram::FacePtr>& R = diagram.getFaces();
@@ -629,6 +628,7 @@ std::list<Voronoi::NewDiagram::FacePtr> build_minKnapsack(Voronoi::NewDiagram& d
     // I keep examining regions until I arrive to the end of the list
     // If I comment the while I test a single iteration!
     while(it != R.end()){
+        //visualize_diagram(R, points);
         firstNew = R.back()->ID + 1;
         std::list<Voronoi::NewDiagram::FacePtr>::iterator firstNewRegion = R.empty() ? R.end() : std::prev(R.end());
         // I partition all the new regions and add new ones to the end of the list
