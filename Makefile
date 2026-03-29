@@ -15,9 +15,10 @@ FILE = Data/equilatero_norm.txt
 #FILE = Data/Lee_fig2.txt # OK! Since I need exactly all points all regions get fused together and I get no region at all
 #FILE = Data/best_example.txt
 #FILE = Data/easy_case.txt
+#FILE = Data/Lee_fig2_easier.txt
 
 # not working, why?
-FILE = Data/hard_case.txt
+#FILE = Data/hard_case.txt
 
 # I don't know the ground truth for these ones
 #FILE = Data/example_1.txt 

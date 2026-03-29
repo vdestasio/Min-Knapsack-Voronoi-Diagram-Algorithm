@@ -5,7 +5,8 @@
 #include <MyGAL/FortuneAlgorithm.h>
 #include "MinKnapsack.h"
 #include <SFML/Graphics.hpp>
-#include "Diagram_visualization.h"
+#include <filesystem>
+// #include <Eigen/Dense>
 
 namespace vor = Voronoi;
 
@@ -43,6 +44,79 @@ std::vector<std::pair<Point2D, double>> readPoints(const std::string& fileName, 
         }
     }
     return points;
+}
+
+// Function to draw a grid
+void drawGrid(sf::RenderWindow& window, int gridSpacing) {
+    sf::VertexArray gridLines(sf::Lines);
+
+    sf::Vector2u windowSize = window.getSize();
+
+    // Vertical lines
+    for (int x = 0; x < windowSize.x; x += gridSpacing) {
+        gridLines.append(sf::Vertex(sf::Vector2f(x, 0), sf::Color(200, 200, 200)));  // Light gray color
+        gridLines.append(sf::Vertex(sf::Vector2f(x, windowSize.y), sf::Color(200, 200, 200)));
+    }
+
+    // Horizontal lines
+    for (int y = 0; y < windowSize.y; y += gridSpacing) {
+        gridLines.append(sf::Vertex(sf::Vector2f(0, y), sf::Color(200, 200, 200)));
+        gridLines.append(sf::Vertex(sf::Vector2f(windowSize.x, y), sf::Color(200, 200, 200)));
+    }
+
+    window.draw(gridLines);
+}
+
+// Function to initialize edge points for SFML
+void initEdgePointsVis(Voronoi::NewDiagram::HalfEdgePtr& h, sf::VertexArray& line,
+    const std::vector<std::pair<Point2D,double>>& points) 
+{
+    if (!h) return; // sanity check
+
+    // Safe pointers
+    auto head = h->head;
+    auto twin = h->twin;
+    auto twinHead = (twin) ? twin->head : nullptr;
+
+    // Case 1: both vertices defined
+    if (head && !head->infinite && twinHead && !twinHead->infinite) {
+        line[0].position = sf::Vector2f(head->point.x, head->point.y);
+        line[1].position = sf::Vector2f(twinHead->point.x, twinHead->point.y);
+    }
+    // Case 2: only head defined
+    else if (head && !head->infinite && twin && twin->label) {
+        line[0].position = sf::Vector2f(head->point.x, head->point.y);
+        Point2D norm = (points[twin->label->index].first - points[h->label->index].first)
+                       .normalized().getRotated90CCW();
+        line[1].position = sf::Vector2f(line[0].position.x + norm.x * 1000,
+                                        line[0].position.y + norm.y * 1000);
+    }
+    // Case 3: only twin's head defined
+    else if (twinHead && !twinHead->infinite && h->label && twin->label) {
+        line[0].position = sf::Vector2f(twinHead->point.x, twinHead->point.y);
+        Point2D norm = (points[h->label->index].first - points[twin->label->index].first)
+                       .normalized().getRotated90CCW();
+        line[1].position = sf::Vector2f(line[0].position.x + norm.x * 1000,
+                                        line[0].position.y + norm.y * 1000);
+    }
+    // Case 4: no vertices defined
+    else if (h->label && twin && twin->label) {
+        Point2D p1 = points[twin->label->index].first;
+        Point2D p2 = points[h->label->index].first;
+        Point2D norm = (p1 - p2).normalized().getRotated90CCW();
+        Point2D c = 0.5 * (p1 + p2);
+        line[0].position = sf::Vector2f(c.x + norm.x * 1000, c.y + norm.y * 1000);
+        line[1].position = sf::Vector2f(c.x - norm.x * 1000, c.y - norm.y * 1000);
+    } 
+    else {
+        // Fallback: set both points to origin to avoid invalid memory access
+        line[0].position = sf::Vector2f(0.f, 0.f);
+        line[1].position = sf::Vector2f(0.f, 0.f);
+    }
+
+    // Set the color of the line
+    line[0].color = sf::Color::Green;
+    line[1].color = sf::Color::Green;
 }
 
 
@@ -97,6 +171,7 @@ void cleanupDiagram(Voronoi::NewDiagram& diagram) {
     // Optional: clear the faces list if you want to completely reset diagram
     diagram.getFaces().clear();
 }
+
 
 
 // Function to modify the old Voronoi diagram structure to a new one
@@ -254,6 +329,90 @@ void modifyStructure(const mygal::Diagram<double>& diagram,
 
 }
 
+bool isInsideConvex(const std::vector<Point2D>& poly, const Point2D& p) {
+    int n = poly.size();
+    if (n < 3) return false;
+
+    for (int i = 0; i < n; ++i) {
+        Point2D a = poly[i];
+        Point2D b = poly[(i + 1) % n];
+
+        if (crossProduct(b - a, p - a) < 0) {
+            return false; // outside
+        }
+    }
+    return true;
+}
+
+std::vector<Point2D> extractRegionVertices(Voronoi::NewDiagram::FacePtr face){
+    std::vector<Point2D> pts;
+
+    Voronoi::NewDiagram::HalfEdgePtr start = face->firstEdge;
+    Voronoi::NewDiagram::HalfEdgePtr e = start;
+
+    do {
+        Voronoi::NewDiagram::VertexPtr v = e->tail;
+
+        if (!v->infinite) {
+            pts.push_back(v->point);
+        }
+
+        e = e->next;
+    } while (e != start);
+
+    return pts;
+}
+
+Point2D weiszfeld(const std::vector<Point2D>& pts, Point2D x0) {
+    Point2D x = x0;
+
+    for (int iter = 0; iter < 100; ++iter) {
+        double num_x = 0, num_y = 0, denom = 0;
+
+        for (const auto& p : pts) {
+            double d = hypot(x.x - p.x, x.y - p.y);
+            if (d < 1e-10) continue;
+
+            num_x += p.x / d;
+            num_y += p.y / d;
+            denom += 1.0 / d;
+        }
+
+        Point2D new_x{num_x / denom, num_y / denom};
+
+        if (hypot(new_x.x - x.x, new_x.y - x.y) < 1e-8)
+            break;
+
+        x = new_x;
+    }
+
+    return x;
+}
+
+// using Vector = Eigen::VectorXd;
+// using Matrix = Eigen::MatrixXd;
+
+// Vector newton(
+//     std::function<Vector(const Vector&)> grad,
+//     std::function<Matrix(const Vector&)> hess,
+//     Vector x0,
+//     int maxIter = 50
+// ) {
+//     Vector x = x0;
+
+//     for (int i = 0; i < maxIter; ++i) {
+//         Vector g = grad(x);
+//         Matrix H = hess(x);
+
+//         Vector dx = H.ldlt().solve(-g);
+
+//         x += dx;
+
+//         if (dx.norm() < 1e-8) break;
+//     }
+
+//     return x;
+// }
 
 int main(int argc, char* argv[]) {
     // Default value
@@ -309,12 +468,6 @@ int main(int argc, char* argv[]) {
     // Read points
     std::vector<std::pair<Point2D, double>> points_with_weights = readPoints(fileName);
     double capacity = readCapacity(fileName);
-    
-    // Print points index and coordinates
-    // std::cout << "Points and weights:\n";
-    // for (size_t i = 0; i < points_with_weights.size(); ++i) {
-    //     std::cout << "Index: " << i << ", Point: (" << points_with_weights[i].first.x << ", " << points_with_weights[i].first.y << "), Weight: " << points_with_weights[i].second << "\n";
-    // }
 
     std::vector<mygal::Vector2<double>> points;
     for (size_t i = 0; i < points_with_weights.size(); ++i) {
@@ -335,83 +488,143 @@ int main(int argc, char* argv[]) {
     modifyStructure(diagram, newDiagram);    
     auto& faces = newDiagram.getFaces();
 
-    // std::cout << "MODIFIED STRUCTURE\n";
-    // auto& fs = newDiagram.getFaces();
-    // for (const auto& face : fs) {
-    //     std::cout << *face <<"\n";
-    //     Voronoi::NewDiagram::HalfEdgePtr x = face->firstEdge;
-    //     do {
-    //         std::cout << *x << "\n";
-    //         x = x->next;
-    //     } while (x != face->firstEdge);
-    // }
-
-    if (minKnapsack){
-        //Construct the min-knapsack Voronoi diagram
-        faces = build_minKnapsack(newDiagram, points_with_weights, capacity);
-    }
+    //Construct the min-knapsack Voronoi diagram
+    faces = build_minKnapsack(newDiagram, points_with_weights, capacity);
     
     // std::cout << "Min Knapsack Voronoi Diagram\n";
     auto& fs = faces;
+    // for (const auto& face : fs) {
+    //     if (face==nullptr) continue;
+    //     std::cout << *face <<"\n";
+    // }
+
     for (const auto& face : fs) {
-        if (face==nullptr) continue;
-        std::cout << *face <<"\n";
-    //     Voronoi::NewDiagram::HalfEdgePtr x = face->firstEdge;
-    //     do {
-    //         if (x == nullptr) {
-    //             std::cout << "Encountered null half-edge!" << std::endl;
-    //             break; // Exit the loop if x is null to prevent dereferencing
-    //         }
-    //         std::cout << *x << "\n";
-    //         x = x->next;
-    //     } while (x != face->firstEdge);
+        std::vector<Point2D> vertices = extractRegionVertices(face);
+    }
+    // TODO instead of recomputing the diagram, save all vertices of each region (but i also need its sites and pivot!)
+
+    std::vector<Point2D> local_optima;
+    std::vector<float> local_optima_cost; // TODO understand how to compute it!!
+    std::vector<Voronoi::NewDiagram::SitePtr> local_optima_sites;
+
+    for (const auto& face : fs) {
+        auto pts = extractRegionVertices(face);
+
+        if (pts.empty()) continue;
+
+        Point2D x0 = pts[0]; // or centroid
+
+        Point2D sol = weiszfeld(pts, x0); //TODO fix!!!
+        
+        if (isInsideConvex(pts, sol)){
+            local_optima.push_back(sol);
+        }
+
+        local_optima_cost.push_back(face->weight);
+        for (const auto& s : face->sites){
+            local_optima_sites.push_back(s);
+        }
+        if (face->pivot != nullptr) {
+            local_optima_sites.push_back(face->pivot);
+        }
+
     }
 
-    bool saved = false;
+    Point2D global_optimum; // TODO select the smallest cost!!!
+     
+
+
     // Visualize the diagram
     if (visualize==true){
-        visualize_diagram(faces, points_with_weights, saved, minKnapsack, fileName);
+        // Create a window
+        sf::RenderWindow window(sf::VideoMode(800, 800), "Plot Points",sf::Style::Close);
+
+        // Create a view that maps from [0, 1] in both axes to the window's size
+        sf::View view;
+        view.setCenter(0.5f, 0.5f);   // Center the view at (0.5, 0.5)
+        view.setSize(1.0f,-1.0f);    // Set the size to (1, -1) to invert the y-axis
+
+        // Apply this view to the window
+        window.setView(view);
+
+        // Disable vsync
+        window.setVerticalSyncEnabled(false);
+
+        // Define the points to plot
+        float radius = 0.01f;
+        sf::Color pointColor = sf::Color::Red;
+        std::vector<sf::CircleShape> shapes;
+        for (const auto& point : points_with_weights) {
+            sf::CircleShape shape(radius);
+            shape.setFillColor(pointColor);
+            shape.setOrigin(radius, radius);
+            shape.setPosition(point.first.x, point.first.y);
+            shapes.push_back(shape);
+        }
+
+        
+        sf::VertexArray allEdges(sf::Lines);
+
+        for (auto& face : faces) {
+            Voronoi::NewDiagram::HalfEdgePtr edge = face->firstEdge;
+            do {
+                sf::VertexArray line(sf::Lines, 2);
+                initEdgePointsVis(edge, line, points_with_weights);
+                allEdges.append(line[0]);
+                allEdges.append(line[1]);
+                // TODO: sometimes the next is nullpointer, understand WHY it's nullpointer!!!
+                edge = edge->next;
+            } while (edge && edge != face->firstEdge);
+        }
+
+        bool saved = true;
+        while (window.isOpen()) {
+            sf::Event event;
+            while (window.pollEvent(event)) {
+                if (event.type == sf::Event::Closed)
+                    window.close();
+
+                // Handle window resizing
+                if (event.type == sf::Event::Resized) {
+                    view.setSize(1.0f,-1.0f* static_cast<float>(event.size.height) / event.size.width);
+                    window.setView(view);
+                }
+            }
+
+            // Clear window with white background
+            window.clear(sf::Color::White);
+
+            // Draw the grid
+            drawGrid(window, 50);
+
+            // Draw all points
+            for (const auto& shape : shapes) {
+                window.draw(shape);
+            }
+
+            // Draw all edges from the stored sf::VertexArray
+            window.draw(allEdges);
+
+            // Display the window's current frame
+            window.display();
+
+            if (!saved) {
+                sf::Texture texture;
+                texture.create(window.getSize().x, window.getSize().y);
+                texture.update(window);
+                std::string suffix = minKnapsack ? "_MKVD" : "_base";   // change if needed
+                std::string folder = "Images";
+                std::string fullPath = folder + "/" +  std::filesystem::path(fileName).stem().string() + suffix + ".png";
+                texture.copyToImage().saveToFile(fullPath);
+                saved = true;
+            }
+        }
     }
+
+
     cleanupDiagram(newDiagram);
 
         
     return 0;
 }
  
-
-// This is the old version that DIDNT check for nullpointers but assumed that the diagram was just correct
-
-
-// void initEdgePointsVis(Voronoi::NewDiagram::HalfEdgePtr& h, sf::VertexArray& line,
-//     const std::vector<std::pair<Point2D,double>>& points) {
-//     if (!h->head->infinite && !h->twin->head->infinite) {
-//         // Both vertices defined, draw line between them
-//         line[0].position = sf::Vector2f(h->head->point.x, h->head->point.y);
-//         line[1].position = sf::Vector2f(h->twin->head->point.x , h->twin->head->point.y);
-//     }
-//     else if (!h->head->infinite) {
-//         // One vertex is defined, project the other
-//         line[0].position = sf::Vector2f(h->head->point.x, h->head->point.y);
-//         Point2D norm = (points[h->twin->label->index].first - points[h->label->index].first).normalized().getRotated90CCW();
-//         line[1].position = sf::Vector2f((line[0].position.x + norm.x * 1000), (line[0].position.y + norm.y * 1000));
-//     }
-//     else if (!h->twin->head->infinite) {
-//         // Only the twin's vertex is defined, project the other
-//         line[0].position = sf::Vector2f(h->twin->head->point.x , h->twin->head->point.y);
-//         Point2D norm = (points[h->label->index].first - points[h->twin->label->index].first).normalized().getRotated90CCW();
-//         line[1].position = sf::Vector2f((line[0].position.x + norm.x * 1000), (line[0].position.y + norm.y * 1000));
-//     }
-//     else {
-//         // No vertices defined, project both points
-//         Point2D p1 = points[h->twin->label->index].first, p2 = points[h->label->index].first;
-//         Point2D norm = (p1 - p2).normalized().getRotated90CCW();
-//         Point2D c = 0.5 * (p1 + p2);
-//         line[0].position = sf::Vector2f((c.x + norm.x * 1000), (c.y + norm.y * 1000));
-//         line[1].position = sf::Vector2f((c.x - norm.x * 1000), (c.y - norm.y * 1000));
-//     }
-
-
-//     // Set the color of the line
-//     line[0].color = sf::Color::Green;
-//     line[1].color = sf::Color::Green;
-// }

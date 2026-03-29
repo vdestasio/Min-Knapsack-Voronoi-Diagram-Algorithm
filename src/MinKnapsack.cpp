@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <vector>
 #include <stdio.h>
+#include <limits>
 #include "MinKnapsack.h"
 #include "Point2D.h"
 #include "UnionFind.cpp"
@@ -142,8 +143,7 @@ void clearFaceVector(std::vector<Voronoi::NewDiagram::FacePtr>& vec) {
 }
 
 // Function to compare sets (I don't care about order of sites, just that they are the same ones!)
-bool same_sites(const std::vector<Voronoi::NewDiagram::SitePtr>& a,
-                const std::vector<Voronoi::NewDiagram::SitePtr>& b) {
+bool same_sites(const std::vector<Voronoi::NewDiagram::SitePtr>& a, const std::vector<Voronoi::NewDiagram::SitePtr>& b) {
     if (a.size() != b.size()) return false;
 
     // make copies to sort
@@ -247,7 +247,6 @@ bool pointInsideRegion(Point2D p, Point2D p1, Point2D p2) {
         >= ((p.y - p1.y) * (p2.x - p1.x)));
 }
 
-
 void chooseDirection(Special_vertex* r) {
     r->direz = EQUAL;
     const double eps = 1e-9;  // tolerance for floating-point comparison
@@ -282,7 +281,6 @@ void chooseDirection(Special_vertex* r) {
     }
 }
 
-
 int circumcenterInside(size_t& r_index, std::vector<Special_vertex>& L, int E, bool open) {
     auto v_ptr = std::make_shared<Voronoi::NewDiagram::Vertex>();
     auto& v = *v_ptr;
@@ -295,6 +293,7 @@ int circumcenterInside(size_t& r_index, std::vector<Special_vertex>& L, int E, b
     auto next_next = L[next_next_index]; 
 
     v.triplet = std::vector{ next.eti_minus, next.eti_plus, next_next.eti_plus };
+    std::cout << "I am checking the circumcenter of the points: " << next.eti_minus->index << ", " << next.eti_plus->index << ", " << next_next.eti_plus->index << "\n";
     v.point = circumcenter(v.triplet);
 
     next.edgein->next->head = v_ptr;
@@ -339,7 +338,6 @@ int circumcenterInside(size_t& r_index, std::vector<Special_vertex>& L, int E, b
         E = 0;
     }else{
         std::cout << "Circumcenter found at subsequent special vertex\n";
-        next_next.edgein->next->next = next.edgein->next->twin;
         createPendingEdge(next.edgein->next, next_next.edgein->next->twin);
 
         Special_vertex p = Special_vertex{};
@@ -355,6 +353,9 @@ int circumcenterInside(size_t& r_index, std::vector<Special_vertex>& L, int E, b
         size_t n1 = (r_index + 1) % n;
         size_t n2 = (r_index + 2) % n;
 
+        // Decide insertion position BEFORE modifying L
+        bool r_was_last = (r_index == n - 1);
+
         std::vector<size_t> rem = { n1, n2 };
         std::sort(rem.begin(), rem.end(), std::greater<size_t>());
 
@@ -366,21 +367,28 @@ int circumcenterInside(size_t& r_index, std::vector<Special_vertex>& L, int E, b
 
         // If r is last, insert p at front, else after r!!
         // this assures that if the region is open then the last special vertex keeps being the infinite one TODO
-        size_t p_index = (r_index == L.size() - 1) ? 0 : (r_index + 1);
+        size_t p_index;
+        if (r_was_last) {
+            p_index = 0;
+            r_index = L.size(); // explicitly fix r (L.size() and not L.size() - 1 because we still have to insert p)
+        } else {
+            p_index = r_index + 1;
+        }
 
         L.insert(L.begin() + p_index, p);
         E--;
-
 
         Special_vertex& r_ref = L[r_index]; //TODO add to pseudocode
         Special_vertex& p_ref = L[p_index]; //TODO add to pseudocode
         Special_vertex& next_ref = L[(p_index + 1) % L.size()]; //TODO add to pseudocode
         
+        std::cout << "R special vertex: " << r_ref << "\n";
+        // Now i check the new possible circumcenter to choose the correct signs/directions for the new special vertex and its neighbors
         Point2D P = circumcenter(r_ref.eti_minus->point, p_ref.eti_minus->point, p_ref.eti_plus->point);
-        // std::cout << "Circumcenter between points: " << r_ref.eti_minus->index << ", " << p_ref.eti_minus->index << ", " << p_ref.eti_plus->index << "\n";
-        // std::cout << "Circumcenter at position: " << P << "\n";
-        // std::cout << "Check if inside w.r.t. line from: " << r_ref.edgein->head->point << " to " << r_ref.edgeout->head->point << "\n";
-        // std::cout << "Point inside region: " << pointInsideRegion(P, r_ref.edgein->head->point, r_ref.edgeout->head->point) << "\n";
+        std::cout << "Circumcenter between points: " << r_ref.eti_minus->index << ", " << p_ref.eti_minus->index << ", " << p_ref.eti_plus->index << "\n";
+        std::cout << "Circumcenter at position: " << P << "\n";
+        std::cout << "Check if inside w.r.t. line from: " << r_ref.edgein->head->point << " to " << r_ref.edgeout->head->point << "\n";
+        std::cout << "Point inside region: " << pointInsideRegion(P, r_ref.edgein->head->point, r_ref.edgeout->head->point) << "\n";
         if (pointInsideRegion(P, p_ref.edgein->tail->point, p_ref.edgein->head->point)) { //TODO add to pseudocode/assure that this is correct
             r_ref.d_plus = dist(P, r_ref.edgeout->tail->point);
             p_ref.d_minus = dist(P, p_ref.edgein->head->point);
@@ -391,10 +399,10 @@ int circumcenterInside(size_t& r_index, std::vector<Special_vertex>& L, int E, b
         }
 
         Point2D P1 = circumcenter(p_ref.eti_minus->point, p_ref.eti_plus->point, next_ref.eti_plus->point);
-        // std::cout << "Circumcenter between points: " << p_ref.eti_minus->index << ", " << p_ref.eti_plus->index << ", " << next_ref.eti_plus->index << "\n";
-        // std::cout << "Circumcenter at position: " << P1 << "\n";
-        // std::cout << "Check if inside w.r.t. line from: " << p_ref.edgein->head->point << " to " << p_ref.edgeout->head->point << "\n";
-        // std::cout << "Point inside region: " << pointInsideRegion(P1, p_ref.edgein->head->point, p_ref.edgeout->head->point) << "\n";
+        std::cout << "Circumcenter between points: " << p_ref.eti_minus->index << ", " << p_ref.eti_plus->index << ", " << next_ref.eti_plus->index << "\n";
+        std::cout << "Circumcenter at position: " << P1 << "\n";
+        std::cout << "Check if inside w.r.t. line from: " << p_ref.edgein->head->point << " to " << p_ref.edgeout->head->point << "\n";
+        std::cout << "Point inside region: " << pointInsideRegion(P1, p_ref.edgein->head->point, p_ref.edgeout->head->point) << "\n";
         if (pointInsideRegion(P1, p_ref.edgein->head->point, p_ref.edgeout->head->point)) { // TODO check if this is correct
             p_ref.d_plus = dist(P1, p_ref.edgeout->tail->point);
             next_ref.d_minus = dist(P1, next_ref.edgein->head->point);
@@ -407,15 +415,14 @@ int circumcenterInside(size_t& r_index, std::vector<Special_vertex>& L, int E, b
         chooseDirection(&p_ref);
         chooseDirection(&next_ref);
 
-        // std::cout << "!!!!!!!!!!!!After inserting new special vertex, I have:\n";
-        // std::cout << "Current special vertex: " << r_ref << "\n";
-        // std::cout << "New special vertex: " << p_ref << "\n";
-        // std::cout << "Next special vertex: " << next_ref << "\n";
-        // std::cout << "End of list!!!!!!!!!!!!\n";
+        std::cout << "!!!!!!!!!!!!After inserting new special vertex, I have:\n";
+        std::cout << "Current special vertex: " << r_ref << "\n";
+        std::cout << "New special vertex: " << p_ref << "\n";
+        std::cout << "Next special vertex: " << next_ref << "\n";
+        std::cout << "End of list!!!!!!!!!!!!\n";
     }
     return E;
 }
-
 
 void partition(Voronoi::NewDiagram::FacePtr& r_ptr, std::list<Voronoi::NewDiagram::FacePtr>& R) {
     auto& r = *r_ptr;
@@ -539,16 +546,27 @@ void partition(Voronoi::NewDiagram::FacePtr& r_ptr, std::list<Voronoi::NewDiagra
             }
 
             int index = 0;
-            //std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!Initial special vertices and their directions:\n";
-            for (auto& vertex : L) {
+            size_t l_last_iter = L.size() - 1; // TODO: why sometimes it does not enter in the if? i should check
+            double min_dis = std::numeric_limits<double>::max();
+
+            std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!Initial special vertices and their directions:\n";
+            for (size_t l_iter = 0; l_iter < L.size(); ++l_iter) {
+                auto& vertex = L.at(l_iter);
                 chooseDirection(&vertex);
-                //std::cout << vertex <<"\n";
+                std::cout << vertex <<"\n";
+                auto& prev = L.at((l_iter + L.size() - 1) % L.size());
+                if (vertex.direz== MINUS &&  prev.direz == PLUS && vertex.d_minus < min_dis) {
+                    min_dis = vertex.d_minus;
+                    l_last_iter = (l_iter + L.size() - 2) % L.size();
+                }
             }
-            //std::cout << "End of list!!!!!!!!!!!!!!!!!!!!!!!!\n";
+            std::cout << "End of list!!!!!!!!!!!!!!!!!!!!!!!!\n";
 
             // Partition in 3 parts (second part)
             // I keep iterating over the special vertices until I finish the partitions to create
-            size_t l_last_iter = L.size() - 1;
+            if (open) {
+                l_last_iter = L.size() - 1;
+            }
             //std::cout << "Last special vertex to examine: " << L.at(l_last_iter) << "\n";
 
             while(true) {
@@ -562,11 +580,11 @@ void partition(Voronoi::NewDiagram::FacePtr& r_ptr, std::list<Voronoi::NewDiagra
                     l_last_iter = (l_last_iter + 1) % L.size();
                 }
 
-                // std::cout << "I am examining vertex: " << L.at(l_last_iter) << "\n and I obtain conditions:\n";
-                // std::cout << "Direction of first special vertex: "<< L[(l_last_iter + 1) % L.size()].direz << "\nDirection of second special vertex: " << L[(l_last_iter + 2) % L.size()].direz << "\nDistance from first vertex to circumcenter: " << L[(l_last_iter + 1) % L.size()].d_plus << "\nFirst vertex is infinite: " << L[(l_last_iter + 1) % L.size()].edgein->head->infinite << "\n";
+                std::cout << "I am examining vertex: " << L.at(l_last_iter) << "\n and I obtain conditions:\n";
+                std::cout << "Direction of first special vertex: "<< L[(l_last_iter + 1) % L.size()].direz << "\nDirection of second special vertex: " << L[(l_last_iter + 2) % L.size()].direz << "\nDistance from first vertex to circumcenter: " << L[(l_last_iter + 1) % L.size()].d_plus << "\nFirst vertex is infinite: " << L[(l_last_iter + 1) % L.size()].edgein->head->infinite << "\n";
 
-                // std::cout << "Number of special vertices left to examine: " << E << "\n";
-                // std::cout << "open:" << open << "\n";
+                std::cout << "Number of special vertices left to examine: " << E << "\n";
+                std::cout << "open:" << open << "\n";
 
                 // Check if there exists a circumcenter inside
                 if (L[(l_last_iter + 1) % L.size()].direz != MINUS &&
@@ -616,8 +634,7 @@ void partition(Voronoi::NewDiagram::FacePtr& r_ptr, std::list<Voronoi::NewDiagra
 
 }
 
-std::list<Voronoi::NewDiagram::FacePtr> build_minKnapsack(Voronoi::NewDiagram& diagram, std::vector<std::pair<Point2D, double>>& points, double capacity)
-{
+std::list<Voronoi::NewDiagram::FacePtr> build_minKnapsack(Voronoi::NewDiagram& diagram, std::vector<std::pair<Point2D, double>>& points, double capacity){
 	std::list<Voronoi::NewDiagram::FacePtr>& R = diagram.getFaces();
     // these two are global variables because I use them inside other functions,
     // TODO remove global variables
@@ -633,8 +650,8 @@ std::list<Voronoi::NewDiagram::FacePtr> build_minKnapsack(Voronoi::NewDiagram& d
         std::list<Voronoi::NewDiagram::FacePtr>::iterator firstNewRegion = R.empty() ? R.end() : std::prev(R.end());
         // I partition all the new regions and add new ones to the end of the list
         while (it != R.end() && (*it)->ID < firstNew) {
-            //std::cout << "I examine the region: " << *(*it);
-            //std::cout << "Point: " << ((*it)->sites).at(0)->point << "\n";
+            std::cout << "I examine the region: " << *(*it);
+            std::cout << "Point: " << ((*it)->sites).at(0)->point << "\n";
             if ((*it)->flag == 1 && (*it)->pivot == nullptr && ((*it)->weight < capacity)) {
                 std::cout << "I divide the region: " << (*it)->ID << "\n";
                 partition(*it, R);
