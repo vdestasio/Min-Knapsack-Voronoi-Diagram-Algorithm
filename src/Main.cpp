@@ -107,6 +107,7 @@ RegionData extractRegion(const Voronoi::NewDiagram::FacePtr& face)
     auto start = face->firstEdge;
     auto e = start;
 
+    // --- STEP 1: collect raw edges ---
     do {
         auto tail = e->tail;
         auto head = e->head;
@@ -117,7 +118,8 @@ RegionData extractRegion(const Voronoi::NewDiagram::FacePtr& face)
                 false,
                 tail->point,
                 head->point,
-                {}, {}
+                {},      // origin
+                {}, {},  // rayDirection, normalDirection
             });
         }
         else {
@@ -127,16 +129,18 @@ RegionData extractRegion(const Voronoi::NewDiagram::FacePtr& face)
 
             if (s1 && s2 && head && !head->infinite) {
 
-                Point2D dir = (s2->point - s1->point).getRotated90CCW();
-                dir.normalize();
-
                 Point2D origin = head->point;
+
+                // geometric direction (Voronoi edge)
+                Point2D rayDir = (s2->point - s1->point).getRotated90CCW();
+                rayDir.normalize();
 
                 region.boundary.push_back({
                     true,
-                    {}, {},
+                    {}, {},      // a, b
                     origin,
-                    dir
+                    rayDir,      // for drawing
+                    {}           // normalDirection (to fill later)
                 });
             }
         }
@@ -145,12 +149,53 @@ RegionData extractRegion(const Voronoi::NewDiagram::FacePtr& face)
 
     } while (e && e != start);
 
-    // sites
+    // --- STEP 2: collect sites ---
     for (auto& s : face->sites)
         region.siteIndices.push_back(s->index);
 
     if (face->pivot)
         region.siteIndices.push_back(face->pivot->index);
+
+    // --- STEP 3: compute interior point ---
+    Point2D interior(0, 0);
+    int count = 0;
+
+    for (auto& s : face->sites) {
+        interior += s->point;
+        count++;
+    }
+
+    if (face->pivot) {
+        interior += face->pivot->point;
+        count++;
+    }
+
+    interior /= count;
+
+    // --- STEP 4: orient everything correctly ---
+    for (auto& edge : region.boundary) {
+
+        if (!edge.isRay) {
+            // --- segment ---
+            Point2D dir = edge.b - edge.a;
+
+            // ensure interior is on the "inside" side
+            if (crossProduct(dir, interior - edge.a) > 0) {
+                std::swap(edge.a, edge.b);
+            }
+        }
+        else {
+            // --- ray ---
+            Point2D normal = edge.rayDirection;
+
+            // orient normal so interior is inside
+            if (crossProduct(normal, interior - edge.origin) > 0) {
+                normal = -normal;
+            }
+
+            edge.normalDirection = normal;
+        }
+    }
 
     return region;
 }
@@ -202,7 +247,8 @@ void saveRegions(
             } else {
                 // ray
                 writePoint(e.origin);
-                writePoint(e.direction);
+                writePoint(e.rayDirection);
+                writePoint(e.normalDirection);
             }
         }
 

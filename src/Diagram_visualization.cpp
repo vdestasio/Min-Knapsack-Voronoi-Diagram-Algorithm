@@ -93,7 +93,7 @@ void appendRegionEdges(
         else {
             // --- ray ---
             Point2D origin = e.origin;
-            Point2D dir = e.direction;
+            Point2D dir = e.rayDirection;
 
             dir.normalize(); // safety
 

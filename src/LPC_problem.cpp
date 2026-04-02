@@ -75,7 +75,8 @@ void loadRegions(const std::string& filename, std::vector<RegionData>& regions)
             } else {
                 // ray
                 readPoint(regions[i].boundary[j].origin);
-                readPoint(regions[i].boundary[j].direction);
+                readPoint(regions[i].boundary[j].rayDirection);
+                readPoint(regions[i].boundary[j].normalDirection);
             }
         }
 
@@ -107,24 +108,52 @@ double valueFunction(const Point2D& x, const std::vector<size_t>& siteIndices, c
     return value;
 }
 
-Point2D weiszfeld(const std::vector<Point2D>& pts, Point2D x0) {
+bool isOptimalAtPoint(const std::vector<Point2D>& pts, const std::vector<double>& weights, size_t k){
+    Point2D sum{0.0, 0.0};
+
+    const Point2D& pk = pts[k];
+
+    for (size_t i = 0; i < pts.size(); ++i) {
+        if (i == k) continue;
+
+        Point2D diff = pk - pts[i];
+        double d = hypot(diff.x, diff.y);
+
+        if (d < 1e-12) continue; // coincident point
+
+        sum.x += weights[i] * diff.x / d;
+        sum.y += weights[i] * diff.y / d;
+    }
+
+    double norm = hypot(sum.x, sum.y);
+
+    return norm <= weights[k];
+}
+
+Point2D weiszfeld(const std::vector<Point2D>& pts, const std::vector<double>& weights, Point2D x0) {
     Point2D x = x0;
 
     for (int iter = 0; iter < 100; ++iter) {
         double num_x = 0, num_y = 0, denom = 0;
 
-        for (const auto& p : pts) {
+        for (size_t i = 0; i < pts.size(); ++i) {
+            const auto& p = pts[i];
+            double w = weights[i];
+
             double d = hypot(x.x - p.x, x.y - p.y);
             if (d < 1e-10) {    
-                return p;
+                if (isOptimalAtPoint(pts, weights, i)) {
+                    std::cout << "Weiszfeld converged to a site point: " << p << "\n";
+                    return p;  
+                } else {
+                    continue;
+                }
             }
 
-            num_x += p.x / d;
-            num_y += p.y / d;
-            denom += 1.0 / d;
+            num_x += (p.x * w) / d;
+            num_y += (p.y * w) / d;
+            denom += w / d;
         }
-        // std::cout << "Weiszfeld iteration " << iter << ": x = " << x << "\n";
-        // std::cout << "  num_x = " << num_x << ", num_y = " << num_y << ", denom = " << denom << "\n";
         if (denom < 1e-12) break;
         
         Point2D new_x{num_x / denom, num_y / denom};
@@ -140,21 +169,31 @@ Point2D weiszfeld(const std::vector<Point2D>& pts, Point2D x0) {
 
 bool isInsideRegion(const RegionData& r, const Point2D& x)
 {
-    const double eps = 1e-12;
+    const double eps = 1e-9;
+    // for (const auto& edge : r.boundary) {
+    // if (!edge.isRay) {
+    //     std::cout << "Edge: (" << edge.a.x << "," << edge.a.y << ") -> "
+    //               << "(" << edge.b.x << "," << edge.b.y << ")\n";
+    // } else {
+    //     std::cout << "Ray from (" << edge.origin.x << "," << edge.origin.y << ") dir ("
+    //               << edge.rayDirection.x << "," << edge.rayDirection.y << ")\n";
+    // }
+    // }
 
     for (const auto& edge : r.boundary) {
 
         if (!edge.isRay) {
             Point2D dir = edge.b - edge.a;
-            if (crossProduct(dir, x - edge.a) > eps)
+            if (crossProduct(dir, x - edge.a) > eps){
                 return false;
+            }
         }
         else {
-            if (crossProduct(edge.direction, x - edge.origin) > eps)
+            if (crossProduct(edge.normalDirection, x - edge.origin) > eps){
                 return false;
-        }
+            }
+        }   
     }
-
     return true;
 }
 
@@ -219,7 +258,11 @@ int main(int argc, char* argv[]) {
     if (capacity >= total_weight) {
         std::cout << "Capacity is greater than total weight of sites. Computing Weiszfeld solution.\n";
         Point2D x0 = Point2D(0,0);
-        Point2D sol = weiszfeld(sitePoints, x0);
+        for (auto p : sitePoints) {
+            x0 += p;
+        }
+        x0 /= (double)sitePoints.size();
+        Point2D sol = weiszfeld(sitePoints, siteCaps, x0);
         double sol_cost = valueFunction(sol, std::vector<size_t>(sitePoints.size()), sitePoints, siteCaps, capacity);
         std::cout << "Weiszfeld solution: " << sol << " with cost: " << sol_cost << "\n";
         return 0;
@@ -261,17 +304,20 @@ int main(int argc, char* argv[]) {
             std::cout << "Single site region, solution is the site: " << sol << "\n";
         }else if (tmp_sites.size() == 2) {
             Point2D a = tmp_sites[0];
+            double w1 = siteCaps[r.siteIndices[0]];
             Point2D b = tmp_sites[1];
-            sol = Point2D((a.x + b.x) * 0.5, (a.y + b.y) * 0.5); //TODO should this be weighted somehow??
-            std::cout << "Two sites region, solution is the midpoint: " << sol << "\n";
+            double w2 = siteCaps[r.siteIndices[1]];
+            sol = Point2D((a.x * w1 + b.x * w2) / (w1 + w2), (a.y * w1 + b.y * w2) / (w1 + w2));
+            std::cout << "Two sites region, solution is the weighted midpoint: " << sol << "\n";
         }else{
-            sol = weiszfeld(tmp_sites, x0); //TODO should this be weighted somehow??
+            sol = weiszfeld(tmp_sites, siteCaps, x0); //TODO should this be weighted somehow??
             std::cout << "Weiszfeld solution: " << sol << "\n";
         }
-        
+        double cost = valueFunction(sol,r.siteIndices, sitePoints, siteCaps, capacity);
+        std::cout << "Solution has cost: " << cost << "\n";
         if (isInsideRegion(r, sol)){
             local_optima.push_back(sol);
-            local_optima_cost.push_back(valueFunction(sol,r.siteIndices, sitePoints, siteCaps, capacity)); 
+            local_optima_cost.push_back(cost); 
             local_optima_sites.push_back(tmp_sites);
             std::cout << "Local optimum for region with sites: ";
             for (const auto& s : r.siteIndices){

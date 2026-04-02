@@ -15,7 +15,9 @@ struct BoundaryElement {
 
     // if ray
     Point2D origin;
-    Point2D direction;
+
+    Point2D rayDirection;     // for drawing
+    Point2D normalDirection;  // for inside test
 };
 
 struct RegionData {
