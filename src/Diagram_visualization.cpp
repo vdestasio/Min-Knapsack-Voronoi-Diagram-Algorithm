@@ -4,6 +4,7 @@
 #include "NewDiagram.h"
 #include "Diagram_visualization.h"
 
+
 // Function to draw a grid
 void drawGrid(sf::RenderWindow& window, int gridSpacing){
     sf::VertexArray gridLines(sf::Lines);
@@ -75,6 +76,101 @@ void initEdgePointsVis(Voronoi::NewDiagram::HalfEdgePtr& h, sf::VertexArray& lin
     line[1].color = sf::Color::Green;
 }
 
+void appendRegionEdges(
+    const RegionData& r,
+    sf::VertexArray& allEdges)
+{
+    for (const auto& e : r.boundary) {
+
+        if (!e.isRay) {
+            // --- segment ---
+            allEdges.append(sf::Vertex(
+                sf::Vector2f(e.a.x, e.a.y), sf::Color::Green));
+
+            allEdges.append(sf::Vertex(
+                sf::Vector2f(e.b.x, e.b.y), sf::Color::Green));
+        }
+        else {
+            // --- ray ---
+            Point2D origin = e.origin;
+            Point2D dir = e.direction;
+
+            dir.normalize(); // safety
+
+            double length = 100.0;
+            Point2D end = origin + dir * length;
+
+            allEdges.append(sf::Vertex(
+                sf::Vector2f(origin.x, origin.y), sf::Color::Blue));
+
+            allEdges.append(sf::Vertex(
+                sf::Vector2f(end.x, end.y), sf::Color::Blue));
+        }
+    }
+}
+
+void visualize_diagram(std::vector<RegionData>& regions,
+                       std::vector<Point2D>& points)
+{
+    std::cout << "Visualizing regions:\n";
+
+    sf::RenderWindow window(sf::VideoMode(800, 800), "Regions", sf::Style::Close);
+
+    sf::View view;
+    view.setCenter(0.5f, 0.5f);
+    view.setSize(1.0f, -1.0f); // invert y
+    window.setView(view);
+
+    window.setVerticalSyncEnabled(false);
+
+    // --- draw points ---
+    float radius = 0.01f;
+    std::vector<sf::CircleShape> shapes;
+    for (const auto& point : points) {
+        sf::CircleShape shape(radius);
+        shape.setFillColor(sf::Color::Red);
+        shape.setOrigin(radius, radius);
+        shape.setPosition(point.x, point.y);
+        shapes.push_back(shape);
+    }
+    // change color to last point
+    if (!points.empty()) {
+        shapes.back().setFillColor(sf::Color::Magenta);
+    }
+
+    // --- build all edges once ---
+    sf::VertexArray allEdges(sf::Lines);
+
+    for (const auto& r : regions) {
+        appendRegionEdges(r, allEdges);
+    }
+
+    // --- render loop ---
+    while (window.isOpen()) {
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed)
+                window.close();
+
+            if (event.type == sf::Event::Resized) {
+                view.setSize(1.0f,
+                    -1.0f * static_cast<float>(event.size.height) / event.size.width);
+                window.setView(view);
+            }
+        }
+
+        window.clear(sf::Color::White);
+
+        drawGrid(window, 50);
+
+        for (const auto& shape : shapes)
+            window.draw(shape);
+
+        window.draw(allEdges);
+
+        window.display();
+    }
+}
 
 void visualize_diagram(std::list<Voronoi::NewDiagram::FacePtr>& faces, std::vector<std::pair<Point2D, double>>& points) {
     std::cout << "Visualizing diagram:\n";
@@ -153,7 +249,6 @@ void visualize_diagram(std::list<Voronoi::NewDiagram::FacePtr>& faces, std::vect
 
     }
 }
-
 
 void visualize_diagram(std::list<Voronoi::NewDiagram::FacePtr>& faces, const std::vector<std::pair<Point2D, double>>& points, bool saved, bool minKnapsack, std::string fileName){
     sf::RenderWindow window(sf::VideoMode(800, 800), "Plot Points",sf::Style::Close);

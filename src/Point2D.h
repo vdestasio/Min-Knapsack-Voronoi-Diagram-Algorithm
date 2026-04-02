@@ -51,8 +51,8 @@ public:
     double norm();
     double norm2();
 
-    Point2D getRotated90CW();
-    Point2D getRotated90CCW();
+    Point2D getRotated90CW() const;
+    Point2D getRotated90CCW() const;
 
     static bool isLeftTurn(const Point2D& p1, const Point2D& p2, const Point2D& p3);
     static bool isRightTurn(const Point2D& p1, const Point2D& p2, const Point2D& p3);

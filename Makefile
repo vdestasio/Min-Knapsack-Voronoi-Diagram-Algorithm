@@ -13,7 +13,7 @@ FILE = Data/equilatero_norm.txt
 #FILE = Data/hardest_one.txt # OK! The closed regions is completely partitioned in order-2 regions 
 #FILE = Data/hardest_one_perturbated.txt 
 #FILE = Data/Lee_fig2.txt # OK! Since I need exactly all points all regions get fused together and I get no region at all
-#FILE = Data/best_example.txt
+FILE = Data/best_example.txt
 #FILE = Data/easy_case.txt
 #FILE = Data/Lee_fig2_easier.txt
 
@@ -40,17 +40,26 @@ DEBUG_FLAGS = -g -fsanitize=address -fno-omit-frame-pointer
 SRC = src/Main.cpp src/MinKnapsack.cpp src/Point2D.cpp src/UnionFind.cpp src/Diagram_visualization.cpp
 OUT = myProgram
 
+OUT_LPC = lpcProgram
+SRC_LPC = src/LPC_problem.cpp src/Point2D.cpp src/Diagram_visualization.cpp
+
 # Targets
-all: $(OUT)
+all: $(OUT) $(OUT_LPC)
 
 $(OUT): $(SRC)
 	$(CC) $(CFLAGS) $(SRC) -o $(OUT) $(LIBS)
+
+$(OUT_LPC): $(SRC_LPC)
+	$(CC) $(CFLAGS) $(SRC_LPC) -o $(OUT_LPC) $(LIBS)
 
 debug_build: CFLAGS += $(DEBUG_FLAGS)
 debug_build: $(OUT)
 
 run: $(OUT)
 	./$(OUT) --file $(FILE) --visualize 1
+
+lpc: $(OUT_LPC)
+	./$(OUT_LPC) --file $(FILE)
 
 base: $(OUT)
 	./$(OUT) --file $(FILE) --visualize 1 --minKnapsack 0
@@ -60,6 +69,9 @@ valgrind: debug_build
 
 debug: debug_build
 	gdb --args ./myProgram --file $(FILE) --visualize 0
+
+debug_lpc: debug_build
+	gdb --args ./lpcProgram --file $(FILE)
 	
 clean:
-	rm -f $(OUT)
+	rm -f $(OUT) $(OUT_LPC)

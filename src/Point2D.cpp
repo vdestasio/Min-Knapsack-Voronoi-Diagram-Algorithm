@@ -140,11 +140,11 @@ double Point2D::norm2() {
     return x * x + y * y;
 }
 
-Point2D Point2D::getRotated90CW() {
+Point2D Point2D::getRotated90CW() const {
     return Point2D(y, -x);
 }
 
-Point2D Point2D::getRotated90CCW() {
+Point2D Point2D::getRotated90CCW() const {
     return Point2D(-y, x);
 }
 

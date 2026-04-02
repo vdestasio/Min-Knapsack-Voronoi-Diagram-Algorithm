@@ -1,6 +1,7 @@
 #include <iostream>
 #include <memory>
-#include <fstream> 
+#include <fstream>
+#include <filesystem> 
 #include <stdio.h>
 #include <MyGAL/FortuneAlgorithm.h>
 #include "MinKnapsack.h"
@@ -8,6 +9,7 @@
 #include "Diagram_visualization.h"
 
 namespace vor = Voronoi;
+
 
 // Global variable to keep track of the current number of region, TODO: implement better solution
 long progressiveID = 0;
@@ -98,10 +100,130 @@ void cleanupDiagram(Voronoi::NewDiagram& diagram) {
     diagram.getFaces().clear();
 }
 
+RegionData extractRegion(const Voronoi::NewDiagram::FacePtr& face)
+{
+    RegionData region;
+
+    auto start = face->firstEdge;
+    auto e = start;
+
+    do {
+        auto tail = e->tail;
+        auto head = e->head;
+
+        // --- CASE 1: finite edge ---
+        if (tail && head && !tail->infinite && !head->infinite) {
+            region.boundary.push_back({
+                false,
+                tail->point,
+                head->point,
+                {}, {}
+            });
+        }
+        else {
+            // --- CASE 2: infinite edge → ray ---
+            auto s1 = e->label;
+            auto s2 = e->twin ? e->twin->label : nullptr;
+
+            if (s1 && s2 && head && !head->infinite) {
+
+                Point2D dir = (s2->point - s1->point).getRotated90CCW();
+                dir.normalize();
+
+                Point2D origin = head->point;
+
+                region.boundary.push_back({
+                    true,
+                    {}, {},
+                    origin,
+                    dir
+                });
+            }
+        }
+
+        e = e->next;
+
+    } while (e && e != start);
+
+    // sites
+    for (auto& s : face->sites)
+        region.siteIndices.push_back(s->index);
+
+    if (face->pivot)
+        region.siteIndices.push_back(face->pivot->index);
+
+    return region;
+}
+
+void saveRegions(
+    const std::list<Voronoi::NewDiagram::FacePtr>& faces,
+    const std::string& filename)
+{
+    std::ofstream out(filename, std::ios::binary);
+
+    if (!out) {
+        std::cerr << "Cannot open file for writing: " << filename << "\n";
+        exit(1);
+    }
+
+    auto writeSize = [&](size_t v) {
+        out.write(reinterpret_cast<const char*>(&v), sizeof(size_t));
+    };
+
+    auto writeBool = [&](bool v) {
+        out.write(reinterpret_cast<const char*>(&v), sizeof(bool));
+    };
+
+    auto writeDouble = [&](double v) {
+        out.write(reinterpret_cast<const char*>(&v), sizeof(double));
+    };
+
+    auto writePoint = [&](const Point2D& p) {
+        writeDouble(p.x);
+        writeDouble(p.y);
+    };
+
+    // number of regions
+    writeSize(faces.size());
+
+    for (const auto& f : faces) {
+        auto r = extractRegion(f);
+
+        // ===== boundary =====
+        writeSize(r.boundary.size());
+
+        for (const auto& e : r.boundary) {
+            writeBool(e.isRay);
+
+            if (!e.isRay) {
+                // segment
+                writePoint(e.a);
+                writePoint(e.b);
+            } else {
+                // ray
+                writePoint(e.origin);
+                writePoint(e.direction);
+            }
+        }
+
+        // ===== site indices =====
+        writeSize(r.siteIndices.size());
+
+        for (size_t idx : r.siteIndices) {
+            writeSize(idx);
+        }
+    }
+
+    out.close();
+
+    if (!out) {
+        std::cerr << "Error while writing file: " << filename << "\n";
+        exit(1);
+    }
+}
 
 // Function to modify the old Voronoi diagram structure to a new one
-void modifyStructure(const mygal::Diagram<double>& diagram,
-    Voronoi::NewDiagram& newDiagram) {
+void modifyStructure(const mygal::Diagram<double>& diagram, Voronoi::NewDiagram& newDiagram) {
 
     // Create a map from old vertices to new vertices
     std::unordered_map<mygal::Diagram<double>::Vertex*, Voronoi::NewDiagram::VertexPtr> mapVertices;
@@ -350,6 +472,8 @@ int main(int argc, char* argv[]) {
         //Construct the min-knapsack Voronoi diagram
         faces = build_minKnapsack(newDiagram, points_with_weights, capacity);
     }
+
+    // TODO: bound the diagram in a box
     
     // std::cout << "Min Knapsack Voronoi Diagram\n";
     auto& fs = faces;
@@ -366,12 +490,16 @@ int main(int argc, char* argv[]) {
     //         x = x->next;
     //     } while (x != face->firstEdge);
     }
+    std::string fullPath = "Data/Saved_diagrams/" +  std::filesystem::path(fileName).stem().string() + ".bin";
+    saveRegions(faces, fullPath);
+
 
     bool saved = false;
     // Visualize the diagram
     if (visualize==true){
         visualize_diagram(faces, points_with_weights, saved, minKnapsack, fileName);
     }
+
     cleanupDiagram(newDiagram);
 
         
