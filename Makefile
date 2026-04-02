@@ -56,7 +56,7 @@ debug_build: CFLAGS += $(DEBUG_FLAGS)
 debug_build: $(OUT)
 
 run: $(OUT)
-	./$(OUT) --file $(FILE) --visualize 1 --minKnapsack 1 --save_diagram 0 --save_image 0
+	./$(OUT) --file $(FILE) --visualize 1 --minKnapsack 1 --save_diagram 1 --save_image 0
 
 lpc: $(OUT_LPC)
 	./$(OUT_LPC) --file $(FILE)

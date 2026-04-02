@@ -11,9 +11,7 @@
 namespace vor = Voronoi;
 
 
-void loadRegions(
-    const std::string& filename,
-    std::vector<RegionData>& regions)
+void loadRegions(const std::string& filename, std::vector<RegionData>& regions)
 {
     std::ifstream in(filename, std::ios::binary);
 
@@ -140,7 +138,6 @@ Point2D weiszfeld(const std::vector<Point2D>& pts, Point2D x0) {
     return x;
 }
 
-
 bool isInsideRegion(const RegionData& r, const Point2D& x)
 {
     const double eps = 1e-12;
@@ -161,30 +158,6 @@ bool isInsideRegion(const RegionData& r, const Point2D& x)
     return true;
 }
 
-// using Vector = Eigen::VectorXd;
-// using Matrix = Eigen::MatrixXd;
-
-// Vector newton(
-//     std::function<Vector(const Vector&)> grad,
-//     std::function<Matrix(const Vector&)> hess,
-//     Vector x0,
-//     int maxIter = 50
-// ) {
-//     Vector x = x0;
-
-//     for (int i = 0; i < maxIter; ++i) {
-//         Vector g = grad(x);
-//         Matrix H = hess(x);
-
-//         Vector dx = H.ldlt().solve(-g);
-
-//         x += dx;
-
-//         if (dx.norm() < 1e-8) break;
-//     }
-
-//     return x;
-// }
 
 int main(int argc, char* argv[]) {
     // Default value
@@ -224,6 +197,7 @@ int main(int argc, char* argv[]) {
     double x, y, weight;
     int points_n = 0, i = 0;
     double capacity = 0.0;
+    double total_weight = 0.0;
     if (in) {
         in >> capacity;
         in >> points_n;
@@ -232,11 +206,24 @@ int main(int argc, char* argv[]) {
             if (p_i == i) {
                 sitePoints.push_back(Point2D(x, y));
                 siteCaps.push_back(weight);
+                total_weight += weight;
+                if (weight >= capacity) {
+                    std::cout << "One point already reaches capacity, optimal solution is that point: " << sitePoints.back() << "\n";
+                    return 0;
+                }
                 i += 1;
             }
         }
     }
     std::cout << "Read " << sitePoints.size() << " sites with capacity: " << capacity << "\n";
+    if (capacity >= total_weight) {
+        std::cout << "Capacity is greater than total weight of sites. Computing Weiszfeld solution.\n";
+        Point2D x0 = Point2D(0,0);
+        Point2D sol = weiszfeld(sitePoints, x0);
+        double sol_cost = valueFunction(sol, std::vector<size_t>(sitePoints.size()), sitePoints, siteCaps, capacity);
+        std::cout << "Weiszfeld solution: " << sol << " with cost: " << sol_cost << "\n";
+        return 0;
+    }
 
 
     std::vector<Point2D> local_optima;
@@ -271,12 +258,12 @@ int main(int argc, char* argv[]) {
         std::cout << "\n";
         if (tmp_sites.size() == 1) {
             sol = tmp_sites[0];
-            std::cout << "Single vertex region, solution is the site: " << sol << "\n";
+            std::cout << "Single site region, solution is the site: " << sol << "\n";
         }else if (tmp_sites.size() == 2) {
             Point2D a = tmp_sites[0];
             Point2D b = tmp_sites[1];
-            sol = Point2D((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
-            std::cout << "Two vertices region, solution is the midpoint: " << sol << "\n";
+            sol = Point2D((a.x + b.x) * 0.5, (a.y + b.y) * 0.5); //TODO should this be weighted somehow??
+            std::cout << "Two sites region, solution is the midpoint: " << sol << "\n";
         }else{
             sol = weiszfeld(tmp_sites, x0); //TODO should this be weighted somehow??
             std::cout << "Weiszfeld solution: " << sol << "\n";
@@ -318,8 +305,9 @@ int main(int argc, char* argv[]) {
     
     if (visualize) {
         std::cout << "Visualizing diagram with local optima...\n";
+        // add global optimum as a site for visualization purposes
         std::vector<Point2D> sites_with_minimum = sitePoints;
-        sites_with_minimum.push_back(global_optimum); // add global optimum as a site for visualization purposes
+        sites_with_minimum.push_back(global_optimum); 
         visualize_diagram(regions, sites_with_minimum);
     }
         
