@@ -387,6 +387,10 @@ int main(int argc, char* argv[]) {
 
     bool minKnapsack = true;
 
+    bool save_image = false;
+
+    bool save_diagram = false;
+
     // Parse command-line arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -415,6 +419,28 @@ int main(int argc, char* argv[]) {
                 else if (val=="1") minKnapsack = true;
                 else {
                     std::cerr << "Invalid value for --minKnapsack: " << val << "\n";
+                    return 1;
+                }
+                i++;
+            }
+        }else if (arg=="--save_image"){
+            if (i +1 < argc){
+                std::string val = argv[i + 1];
+                if (val == "0") save_image = false;
+                else if (val=="1") save_image = true;
+                else {
+                    std::cerr << "Invalid value for --save-image: " << val << "\n";
+                    return 1;
+                }
+                i++;
+            }
+        }else if (arg=="--save_diagram"){
+            if (i +1 < argc){
+                std::string val = argv[i + 1];
+                if (val == "0") save_diagram = false;
+                else if (val=="1") save_diagram = true;
+                else {
+                    std::cerr << "Invalid value for --save-diagram: " << val << "\n";
                     return 1;
                 }
                 i++;
@@ -491,13 +517,13 @@ int main(int argc, char* argv[]) {
     //     } while (x != face->firstEdge);
     }
     std::string fullPath = "Data/Saved_diagrams/" +  std::filesystem::path(fileName).stem().string() + ".bin";
-    saveRegions(faces, fullPath);
+    if (save_diagram){
+        saveRegions(faces, fullPath);
+    }
 
-
-    bool saved = false;
     // Visualize the diagram
     if (visualize==true){
-        visualize_diagram(faces, points_with_weights, saved, minKnapsack, fileName);
+        visualize_diagram(faces, points_with_weights, save_image, minKnapsack, fileName);
     }
 
     cleanupDiagram(newDiagram);
