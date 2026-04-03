@@ -22,6 +22,8 @@ Next thing to fix: I have to follow the example and assure that the special vert
 
 I also need to understand if I need to keep regions update or not
 
+IMPORTANT: I had to make the special vertices be checked two times. Otherwise I risk to merge together wrong vertices before the right ones. I also start merging from the circumcenter that is closest to the border. Maybe there is a way to avoid merging the wrong vertices before time? To be researched...
+
 ## What should happen for each example
 - equilatero_norm &#8594; 3 points, I need exactly 2 to satisfy the request. I expect to see all regions of order 2.
 - four_points &#8594; 4 points, I need exactly 2 to satisfy the request. I expect to see all regions of order 2.
