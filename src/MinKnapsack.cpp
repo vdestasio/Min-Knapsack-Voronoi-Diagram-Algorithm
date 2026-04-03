@@ -619,10 +619,7 @@ void partition(Voronoi::NewDiagram::FacePtr& r_ptr, std::list<Voronoi::NewDiagra
                     L.clear();
                     E = 0;
                 }
-                if (E!=0){
-                    // By default I pass to the next special vertex
-                    l_last_iter = (l_last_iter + 1) % L.size();
-                }else{
+                if (E==0){
                     std::cout << "Finished partitioning region!\n";
                     break;
                 }
@@ -634,7 +631,7 @@ void partition(Voronoi::NewDiagram::FacePtr& r_ptr, std::list<Voronoi::NewDiagra
 
 }
 
-std::list<Voronoi::NewDiagram::FacePtr> build_minKnapsack(Voronoi::NewDiagram& diagram, std::vector<std::pair<Point2D, double>>& points, double capacity){
+std::list<Voronoi::NewDiagram::FacePtr> build_minKnapsack(Voronoi::NewDiagram& diagram, std::vector<std::pair<Point2D, double>>& points, double capacity) {
 	std::list<Voronoi::NewDiagram::FacePtr>& R = diagram.getFaces();
     // these two are global variables because I use them inside other functions,
     // TODO remove global variables

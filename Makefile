@@ -2,7 +2,7 @@
 CC = g++
 
 # Default file
-#FILE = Data/equilatero_norm.txt
+FILE = Data/equilatero_norm.txt
 
 # work according to ground truth
 #FILE = Data/Lee_1.txt # OK! but a bit cheating bcs this one should just stay order-1
@@ -14,13 +14,12 @@ CC = g++
 #FILE = Data/hardest_one_perturbated.txt 
 #FILE = Data/Lee_fig2.txt # OK! Since I need exactly all points all regions get fused together and I get no region at all
 #FILE = Data/best_example.txt
-FILE = Data/easy_case.txt
+#FILE = Data/easy_case.txt
 #FILE = Data/Lee_fig2_easier.txt
 
-# not working, why?
-#FILE = Data/hard_case.txt
 
 # I don't know the ground truth for these ones
+#FILE = Data/hard_case.txt
 #FILE = Data/example_1.txt 
 #FILE = Data/example_2.txt
 #FILE = Data/Lee_fig2_2.txt
@@ -56,7 +55,7 @@ debug_build: CFLAGS += $(DEBUG_FLAGS)
 debug_build: $(OUT)
 
 run: $(OUT)
-	./$(OUT) --file $(FILE) --visualize 1 --minKnapsack 1 --save_diagram 1 --save_image 0
+	./$(OUT) --file $(FILE) --visualize 1 --minKnapsack 1 --save_diagram 0 --save_image 0
 
 lpc: $(OUT_LPC)
 	./$(OUT_LPC) --file $(FILE)
