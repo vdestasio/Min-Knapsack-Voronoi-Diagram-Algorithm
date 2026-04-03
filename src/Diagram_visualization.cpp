@@ -76,10 +76,7 @@ void initEdgePointsVis(Voronoi::NewDiagram::HalfEdgePtr& h, sf::VertexArray& lin
     line[1].color = sf::Color::Green;
 }
 
-void appendRegionEdges(
-    const RegionData& r,
-    sf::VertexArray& allEdges)
-{
+void appendRegionEdges(const RegionData& r, sf::VertexArray& allEdges){
     for (const auto& e : r.boundary) {
 
         if (!e.isRay) {
@@ -109,9 +106,7 @@ void appendRegionEdges(
     }
 }
 
-void visualize_diagram(std::vector<RegionData>& regions,
-                       std::vector<Point2D>& points)
-{
+void visualize_diagram(std::vector<RegionData>& regions, std::vector<Point2D>& points){
     std::cout << "Visualizing regions:\n";
 
     sf::RenderWindow window(sf::VideoMode(800, 800), "Regions", sf::Style::Close);
@@ -253,6 +248,17 @@ void visualize_diagram(std::list<Voronoi::NewDiagram::FacePtr>& faces, std::vect
 void visualize_diagram(std::list<Voronoi::NewDiagram::FacePtr>& faces, const std::vector<std::pair<Point2D, double>>& points, bool saved, bool minKnapsack, std::string fileName){
     sf::RenderWindow window(sf::VideoMode(800, 800), "Plot Points",sf::Style::Close);
 
+    auto size = window.getSize();
+    sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
+
+    window.setPosition(sf::Vector2i(
+        (desktop.width - size.x) / 2,
+        (desktop.height - size.y) / 2
+    ));
+    
+    bool dragging = false;
+    sf::Vector2i lastMousePos;
+
     // Create a view that maps from [0, 1] in both axes to the window's size
     sf::View view;
     view.setCenter(0.5f, 0.5f);   // Center the view at (0.5, 0.5)
@@ -296,6 +302,34 @@ void visualize_diagram(std::list<Voronoi::NewDiagram::FacePtr>& faces, const std
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed)
                 window.close();
+
+            if (event.type == sf::Event::MouseButtonPressed) {
+                if (event.mouseButton.button == sf::Mouse::Left) {
+                    dragging = true;
+                    lastMousePos = sf::Mouse::getPosition(window);
+                }
+            }
+
+            if (event.type == sf::Event::MouseButtonReleased) {
+                if (event.mouseButton.button == sf::Mouse::Left) {
+                    dragging = false;
+                }
+            }
+
+            if (event.type == sf::Event::MouseMoved && dragging) {
+                sf::Vector2i newMousePos = sf::Mouse::getPosition(window);
+
+                // convert pixel movement to world movement
+                sf::Vector2f worldPos1 = window.mapPixelToCoords(lastMousePos);
+                sf::Vector2f worldPos2 = window.mapPixelToCoords(newMousePos);
+
+                sf::Vector2f delta = worldPos1 - worldPos2;
+
+                view.move(delta);
+                window.setView(view);
+
+                lastMousePos = newMousePos;
+            }
 
             // Handle window resizing
             if (event.type == sf::Event::Resized) {
