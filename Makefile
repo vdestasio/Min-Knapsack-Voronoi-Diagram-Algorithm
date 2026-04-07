@@ -32,7 +32,7 @@ FILE = Data/equilatero_norm.txt
 
 # Generic flags that are always valid 
 CFLAGS = -std=c++17 -Isrc/MyGAL/include
-LIBS =  -lsfml-graphics -lsfml-window -lsfml-system
+LIBS =  -lsfml-graphics -lsfml-window -lsfml-system -lnlopt
 
 # The flags 
 DEBUG_FLAGS = -g -fsanitize=address -fno-omit-frame-pointer
@@ -55,10 +55,10 @@ debug_build: CFLAGS += $(DEBUG_FLAGS)
 debug_build: $(OUT)
 
 run: $(OUT)
-	./$(OUT) --file $(FILE) --visualize 1 --minKnapsack 1 --save_diagram 0 --save_image 0
+	./$(OUT) --file $(FILE) --visualize 1 --minKnapsack 1 --save_diagram 1 --save_image 0
 
 lpc: $(OUT_LPC)
-	./$(OUT_LPC) --file $(FILE)
+	./$(OUT_LPC) --file $(FILE) --weiszfeld_method 0
 
 base: $(OUT)
 	./$(OUT) --file $(FILE) --visualize 1 --minKnapsack 0
@@ -70,7 +70,7 @@ debug: debug_build
 	gdb --args ./myProgram --file $(FILE) --visualize 0
 
 debug_lpc: debug_build
-	gdb --args ./lpcProgram --file $(FILE)
+	gdb --args ./lpcProgram --file $(FILE) --method PNL
 	
 clean:
 	rm -f $(OUT) $(OUT_LPC)

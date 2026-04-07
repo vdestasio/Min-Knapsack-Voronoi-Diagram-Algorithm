@@ -2,6 +2,7 @@
 #include <memory>
 #include <fstream> 
 #include <stdio.h>
+#include <nlopt.h>
 #include <MyGAL/FortuneAlgorithm.h>
 #include "MinKnapsack.h"
 #include <filesystem>
@@ -11,8 +12,7 @@
 namespace vor = Voronoi;
 
 
-void loadRegions(const std::string& filename, std::vector<RegionData>& regions)
-{
+void loadRegions(const std::string& filename, std::vector<RegionData>& regions) {
     std::ifstream in(filename, std::ios::binary);
 
     if (!in) {
@@ -108,7 +108,7 @@ double valueFunction(const Point2D& x, const std::vector<size_t>& siteIndices, c
     return value;
 }
 
-bool isOptimalAtPoint(const std::vector<Point2D>& pts, const std::vector<double>& weights, size_t k){
+bool isOptimalAtPoint(const std::vector<Point2D>& pts, const std::vector<double>& weights, size_t k) {
     Point2D sum{0.0, 0.0};
 
     const Point2D& pk = pts[k];
@@ -167,8 +167,85 @@ Point2D weiszfeld(const std::vector<Point2D>& pts, const std::vector<double>& we
     return x;
 }
 
-bool isInsideRegion(const RegionData& r, const Point2D& x)
-{
+
+double objective(unsigned n, const double* x, double* grad, void* data) {
+    auto* ctx = static_cast<
+        std::pair<const std::vector<Point2D>*, const std::vector<double>*>*
+    >(data);
+
+    const auto& pts = *ctx->first;
+    const auto& weights = *ctx->second;
+
+    double value = 0.0;
+
+    for (size_t i = 0; i < pts.size(); ++i) {
+        double dx = x[0] - pts[i].x;
+        double dy = x[1] - pts[i].y;
+        double d = std::hypot(dx, dy);
+
+        value += weights[i] * d;
+    }
+
+    return value;
+}
+
+double edge_constraint(unsigned /*n*/, const double* x, double* /*grad*/, void* data) {
+    const auto* e = static_cast<const BoundaryElement*>(data);
+
+    Point2D X{x[0], x[1]};
+
+    if (!e->isRay) {
+        Point2D dir = e->b - e->a;
+        return crossProduct(dir, X - e->a);  // ≤ 0 inside
+    } else {
+        // use rayDirection, NOT normalDirection
+        return crossProduct(e->rayDirection, X - e->origin);  // ≤ 0 inside
+    }
+}
+
+Point2D solveNLP(const RegionData& region, const std::vector<Point2D>& pts, const std::vector<double>& weights, Point2D x0) {
+    nlopt_opt opt = nlopt_create(NLOPT_LN_COBYLA, 2);
+
+    auto ctx = std::make_pair(&pts, &weights);
+
+    nlopt_set_min_objective(opt, objective, &ctx);
+    nlopt_set_xtol_rel(opt, 1e-6);
+    nlopt_set_maxeval(opt, 300);
+
+
+    // for (const auto& e : region.boundary) {
+    //     double val;
+
+    //     if (!e.isRay) {
+    //         val = crossProduct(e.b - e.a, x0 - e.a);
+    //     } else {
+    //         val = crossProduct(e.rayDirection, x0 - e.origin);
+    //     }
+
+    //     std::cout << "Constraint at x0: " << val << "\n";
+    // }
+
+    // constraints
+    for (const auto& e : region.boundary) {
+        nlopt_add_inequality_constraint(opt, edge_constraint, (void*)&e, 1e-8);
+    }
+
+    double x[2] = {x0.x, x0.y};
+    double minf;
+
+    nlopt_result result = nlopt_optimize(opt, x, &minf);
+
+    nlopt_destroy(opt);
+    std::cout << "Result code: " << result << "\n";
+
+    if (result < 0) {
+        return Point2D{NAN, NAN};
+    }
+
+    return Point2D{x[0], x[1]};
+}
+
+bool isInsideRegion(const RegionData& r, const Point2D& x) {
     const double eps = 1e-9;
     // for (const auto& edge : r.boundary) {
     // if (!edge.isRay) {
@@ -199,9 +276,10 @@ bool isInsideRegion(const RegionData& r, const Point2D& x)
 
 
 int main(int argc, char* argv[]) {
-    // Default value
+    // Default values
     std::string fileName = "Data/equilatero_norm.txt";
     bool visualize = true;
+    bool weiszfeld_method = true;
 
     // Parse command-line arguments
     for (int i = 1; i < argc; ++i) {
@@ -209,7 +287,7 @@ int main(int argc, char* argv[]) {
 
         if (arg == "--file" && i + 1 < argc) {
             fileName = argv[++i];  // Take the next argument as filename
-        }        else if (arg == "--visualize") {
+        }else if (arg == "--visualize") {
             if (i + 1 < argc) {                   // Make sure there is a next argument
                 std::string val = argv[i + 1];    // Read it
                 if (val == "1") visualize = true;
@@ -221,6 +299,16 @@ int main(int argc, char* argv[]) {
                 i++; // Skip the value for next iteration
             } else {
                 std::cerr << "--visualize requires 0 or 1\n";
+                return 1;
+            }
+        }else if (arg=="--weiszfeld_method" && i + 1 < argc) {
+            std::string method = argv[++i];
+            if (method == "0") {
+                weiszfeld_method = false;
+            }else if (method == "1") {
+                weiszfeld_method = true;
+            }else{
+                std::cerr << "Unknown method: " << method << "\n";
                 return 1;
             }
         }else {
@@ -254,9 +342,11 @@ int main(int argc, char* argv[]) {
             }
         }
     }
+
     std::cout << "Read " << sitePoints.size() << " sites with capacity: " << capacity << "\n";
+
     if (capacity >= total_weight) {
-        std::cout << "Capacity is greater than total weight of sites. Computing Weiszfeld solution.\n";
+        std::cout << "Capacity is greater or equal than total weight of sites. Computing Weiszfeld solution.\n";
         Point2D x0 = Point2D(0,0);
         for (auto p : sitePoints) {
             x0 += p;
@@ -277,11 +367,14 @@ int main(int argc, char* argv[]) {
 
     loadRegions(fullPath, regions);
     std::cout << "Loaded " << regions.size() << " regions\n";
+    bool check_inside = false;
+    bool save_local_optima = false;
 
     // For each region find the corresponding solution with weiszfeld and check if it's inside the region,
     // if it is, compute the cost of that solution and add it to the local optima
     // if the local optima is the smallest one, update the global optimum
     for (auto& r : regions) {
+        save_local_optima = false;
         std::vector<Point2D> tmp_sites;
         for (const auto& s : r.siteIndices){
             tmp_sites.push_back(sitePoints[s]);
@@ -301,7 +394,9 @@ int main(int argc, char* argv[]) {
         std::cout << "\n";
         if (tmp_sites.size() == 1) {
             sol = tmp_sites[0];
+            // Actually, I'll never reach this case since I already check if any single site reaches total capacity
             std::cout << "Single site region, solution is the site: " << sol << "\n";
+            check_inside = true;
         }else if (tmp_sites.size() == 2) {
             Point2D a = tmp_sites[0];
             double w1 = siteCaps[r.siteIndices[0]];
@@ -309,13 +404,26 @@ int main(int argc, char* argv[]) {
             double w2 = siteCaps[r.siteIndices[1]];
             sol = Point2D((a.x * w1 + b.x * w2) / (w1 + w2), (a.y * w1 + b.y * w2) / (w1 + w2));
             std::cout << "Two sites region, solution is the weighted midpoint: " << sol << "\n";
-        }else{
-            sol = weiszfeld(tmp_sites, siteCaps, x0); //TODO should this be weighted somehow??
+            check_inside = true;
+        }else if (weiszfeld_method){
+            sol = weiszfeld(tmp_sites, siteCaps, x0); 
             std::cout << "Weiszfeld solution: " << sol << "\n";
+            check_inside = true;
+        }else {
+            sol = solveNLP(r, tmp_sites, siteCaps, x0);
+            std::cout << "PNL solver solution: " << sol << "\n";
+            if (std::isnan(sol.x) || std::isnan(sol.y)) {
+                std::cout << "NLP solver failed to find a solution";
+                save_local_optima = false;
+            }else{
+                save_local_optima = true;
+            }
         }
-        double cost = valueFunction(sol,r.siteIndices, sitePoints, siteCaps, capacity);
-        std::cout << "Solution has cost: " << cost << "\n";
-        if (isInsideRegion(r, sol)){
+        if (check_inside && isInsideRegion(r, sol)) {
+            save_local_optima = true;
+        }
+        if (save_local_optima){
+            double cost = valueFunction(sol,r.siteIndices, sitePoints, siteCaps, capacity);
             local_optima.push_back(sol);
             local_optima_cost.push_back(cost); 
             local_optima_sites.push_back(tmp_sites);
@@ -328,6 +436,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Solution is outside the region, skipping...\n";
         }
     }
+
     if (local_optima.size() == 0) {
         std::cout << "ERROR: No local optima found inside any region.\n";
         return 0;
