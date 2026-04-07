@@ -43,10 +43,12 @@ std::vector<std::pair<Point2D, double>> readPoints(const std::string& fileName, 
                 i += step;
             }
         }
+    }else{
+        std::cerr << "Cannot open file: " << fileName << "\n";
+        exit(1);
     }
     return points;
 }
-
 
 // ChatGPT function that deletes all pointers references and assures that there are no leaks (used at the very end of the program)
 void cleanupDiagram(Voronoi::NewDiagram& diagram) {
@@ -200,9 +202,7 @@ RegionData extractRegion(const Voronoi::NewDiagram::FacePtr& face)
     return region;
 }
 
-void saveRegions(
-    const std::list<Voronoi::NewDiagram::FacePtr>& faces,
-    const std::string& filename)
+void saveRegions(const std::list<Voronoi::NewDiagram::FacePtr>& faces, const std::string& filename)
 {
     std::ofstream out(filename, std::ios::binary);
 
@@ -422,7 +422,6 @@ void modifyStructure(const mygal::Diagram<double>& diagram, Voronoi::NewDiagram&
 
 }
 
-
 int main(int argc, char* argv[]) {
     // Default value
     std::string fileName = "Data/equilatero_norm.txt";
@@ -433,7 +432,9 @@ int main(int argc, char* argv[]) {
 
     bool minKnapsack = true;
 
-    bool save_image = false;
+    bool save_final = false;
+
+    bool save_each_image = false;
 
     bool save_diagram = false;
 
@@ -469,13 +470,17 @@ int main(int argc, char* argv[]) {
                 }
                 i++;
             }
-        }else if (arg=="--save_image"){
+        }else if (arg=="--save_final"){
             if (i +1 < argc){
                 std::string val = argv[i + 1];
-                if (val == "0") save_image = false;
-                else if (val=="1") save_image = true;
+                if (val == "0") save_final = false;
+                else if (val=="1") save_final = true;
                 else {
-                    std::cerr << "Invalid value for --save-image: " << val << "\n";
+                    std::cerr << "Invalid value for --save-final: " << val << "\n";
+                    return 1;
+                }
+                if (visualize==false && save_final==true){
+                    std::cerr << "Cannot save final image if visualization is disabled.\n";
                     return 1;
                 }
                 i++;
@@ -487,6 +492,24 @@ int main(int argc, char* argv[]) {
                 else if (val=="1") save_diagram = true;
                 else {
                     std::cerr << "Invalid value for --save-diagram: " << val << "\n";
+                    return 1;
+                }
+                i++;
+            }
+        }else if (arg=="--save_each_step"){
+            if (i +1 < argc){
+                std::string val = argv[i + 1];
+                if (val == "0") {save_each_image = false;}
+                else if (val=="1") {
+                    save_each_image = true;
+                    save_final = false; // if we save each step we already save the final image
+                }
+                else {
+                    std::cerr << "Invalid value for --save_each_step: " << val << "\n";
+                    return 1;
+                }
+                if (visualize==false && save_each_image==true){
+                    std::cerr << "Cannot save images of each step if visualization is disabled.\n";
                     return 1;
                 }
                 i++;
@@ -542,10 +565,8 @@ int main(int argc, char* argv[]) {
 
     if (minKnapsack){
         //Construct the min-knapsack Voronoi diagram
-        faces = build_minKnapsack(newDiagram, points_with_weights, capacity);
+        faces = build_minKnapsack(newDiagram, points_with_weights, capacity, save_each_image, fileName);
     }
-
-    // TODO: bound the diagram in a box
     
     // std::cout << "Min Knapsack Voronoi Diagram\n";
     auto& fs = faces;
@@ -562,6 +583,7 @@ int main(int argc, char* argv[]) {
     //         x = x->next;
     //     } while (x != face->firstEdge);
     }
+    
     std::string fullPath = "Data/Saved_diagrams/" +  std::filesystem::path(fileName).stem().string() + ".bin";
     if (save_diagram){
         saveRegions(faces, fullPath);
@@ -569,7 +591,7 @@ int main(int argc, char* argv[]) {
 
     // Visualize the diagram
     if (visualize==true){
-        visualize_diagram(faces, points_with_weights, save_image, minKnapsack, fileName);
+        visualize_diagram(faces, points_with_weights, save_final, -1, fileName);
     }
 
     cleanupDiagram(newDiagram);

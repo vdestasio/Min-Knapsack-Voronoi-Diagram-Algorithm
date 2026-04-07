@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <vector>
 #include <stdio.h>
+#include <filesystem>
 #include <limits>
 #include "MinKnapsack.h"
 #include "Point2D.h"
@@ -631,7 +632,7 @@ void partition(Voronoi::NewDiagram::FacePtr& r_ptr, std::list<Voronoi::NewDiagra
 
 }
 
-std::list<Voronoi::NewDiagram::FacePtr> build_minKnapsack(Voronoi::NewDiagram& diagram, std::vector<std::pair<Point2D, double>>& points, double capacity) {
+std::list<Voronoi::NewDiagram::FacePtr> build_minKnapsack(Voronoi::NewDiagram& diagram, std::vector<std::pair<Point2D, double>>& points, double capacity, bool visualize, const std::string& fileName) {
 	std::list<Voronoi::NewDiagram::FacePtr>& R = diagram.getFaces();
     // these two are global variables because I use them inside other functions,
     // TODO remove global variables
@@ -641,8 +642,12 @@ std::list<Voronoi::NewDiagram::FacePtr> build_minKnapsack(Voronoi::NewDiagram& d
     long firstNew = R.size();
     // I keep examining regions until I arrive to the end of the list
     // If I comment the while I test a single iteration!
+    int order = 0;
+    if (visualize) {
+        visualize_diagram(R, points, visualize, order, fileName);
+        order=2;
+    }
     while(it != R.end()){
-        //visualize_diagram(R, points);
         firstNew = R.back()->ID + 1;
         std::list<Voronoi::NewDiagram::FacePtr>::iterator firstNewRegion = R.empty() ? R.end() : std::prev(R.end());
         // I partition all the new regions and add new ones to the end of the list
@@ -658,8 +663,17 @@ std::list<Voronoi::NewDiagram::FacePtr> build_minKnapsack(Voronoi::NewDiagram& d
             }
             ++it;
         }
+
         // If no new regions have been added I return right away!
         if (firstNew==(R.back()->ID + 1)){
+            if (visualize) {
+                std::string suffix="_" + std::to_string(order-1) + "_order";
+                std::string folder = "Images/" + std::filesystem::path(fileName).stem().string();
+                std::string fullPath = folder + "/diagram" + suffix + ".png";
+                std::filesystem::remove(fullPath);
+                visualize_diagram(R, points, visualize, -1, fileName);
+                order++;
+            }
             return R;
         }
         std::cout << "I partitioned all regions!\n";
@@ -786,6 +800,10 @@ std::list<Voronoi::NewDiagram::FacePtr> build_minKnapsack(Voronoi::NewDiagram& d
         }
         it = firstNewRegion;
         //std::cout << "I deleted all useless regions!\n";
+        if (visualize){
+            visualize_diagram(R, points, visualize, order, fileName);
+            order++;
+        }
     }
     return R;
 }

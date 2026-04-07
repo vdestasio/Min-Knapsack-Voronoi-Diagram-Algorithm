@@ -14,7 +14,7 @@ FILE = Data/equilatero_norm.txt
 #FILE = Data/hardest_one_perturbated.txt 
 #FILE = Data/Lee_fig2.txt # OK! Since I need exactly all points all regions get fused together and I get no region at all
 #FILE = Data/best_example.txt
-#FILE = Data/easy_case.txt
+FILE = Data/easy_case.txt
 #FILE = Data/Lee_fig2_easier.txt
 
 
@@ -55,10 +55,10 @@ debug_build: CFLAGS += $(DEBUG_FLAGS)
 debug_build: $(OUT)
 
 run: $(OUT)
-	./$(OUT) --file $(FILE) --visualize 1 --minKnapsack 1 --save_diagram 1 --save_image 0
+	./$(OUT) --file $(FILE) --visualize 0 --minKnapsack 1 --save_diagram 1 --save_final 0 --save_each_step 0
 
 lpc: $(OUT_LPC)
-	./$(OUT_LPC) --file $(FILE) --weiszfeld_method 0
+	./$(OUT_LPC) --file $(FILE) --weiszfeld_method 1
 
 base: $(OUT)
 	./$(OUT) --file $(FILE) --visualize 1 --minKnapsack 0

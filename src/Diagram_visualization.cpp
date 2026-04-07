@@ -168,84 +168,10 @@ void visualize_diagram(std::vector<RegionData>& regions, std::vector<Point2D>& p
 }
 
 void visualize_diagram(std::list<Voronoi::NewDiagram::FacePtr>& faces, std::vector<std::pair<Point2D, double>>& points) {
-    std::cout << "Visualizing diagram:\n";
-    // Visualize the diagram
-    // Create a window
-    sf::RenderWindow window(sf::VideoMode(800, 800), "Plot Points",sf::Style::Close);
-
-    // Create a view that maps from [0, 1] in both axes to the window's size
-    sf::View view;
-    view.setCenter(0.5f, 0.5f);   // Center the view at (0.5, 0.5)
-    view.setSize(1.0f,-1.0f);    // Set the size to (1, -1) to invert the y-axis
-
-    // Apply this view to the window
-    window.setView(view);
-
-    // Disable vsync
-    window.setVerticalSyncEnabled(false);
-
-    // Define the points to plot
-    float radius = 0.01f;
-    sf::Color pointColor = sf::Color::Red;
-    std::vector<sf::CircleShape> shapes;
-    for (const auto& point : points) {
-        sf::CircleShape shape(radius);
-        shape.setFillColor(pointColor);
-        shape.setOrigin(radius, radius);
-        shape.setPosition(point.first.x, point.first.y);
-        shapes.push_back(shape);
-    }
-
-    
-    sf::VertexArray allEdges(sf::Lines);
-
-    for (auto& face : faces) {
-        Voronoi::NewDiagram::HalfEdgePtr edge = face->firstEdge;
-        do {
-            sf::VertexArray line(sf::Lines, 2);
-            initEdgePointsVis(edge, line, points);
-            allEdges.append(line[0]);
-            allEdges.append(line[1]);
-            // TODO: sometimes the next is nullpointer, understand WHY it's nullpointer!!!
-            edge = edge->next;
-        } while (edge && edge != face->firstEdge);
-    }
-
-    bool saved = true;
-    while (window.isOpen()) {
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed)
-                window.close();
-
-            // Handle window resizing
-            if (event.type == sf::Event::Resized) {
-                view.setSize(1.0f,-1.0f* static_cast<float>(event.size.height) / event.size.width);
-                window.setView(view);
-            }
-        }
-
-        // Clear window with white background
-        window.clear(sf::Color::White);
-
-        // Draw the grid
-        drawGrid(window, 50);
-
-        // Draw all points
-        for (const auto& shape : shapes) {
-            window.draw(shape);
-        }
-
-        // Draw all edges from the stored sf::VertexArray
-        window.draw(allEdges);
-
-        // Display the window's current frame
-        window.display();
-
-    }
+    visualize_diagram(faces, points, false, false, "");
 }
 
-void visualize_diagram(std::list<Voronoi::NewDiagram::FacePtr>& faces, const std::vector<std::pair<Point2D, double>>& points, bool saved, bool minKnapsack, std::string fileName){
+void visualize_diagram(std::list<Voronoi::NewDiagram::FacePtr>& faces, const std::vector<std::pair<Point2D, double>>& points, bool saved, int minKnapsack, std::string fileName){
     sf::RenderWindow window(sf::VideoMode(800, 800), "Plot Points",sf::Style::Close);
 
     auto size = window.getSize();
@@ -359,9 +285,19 @@ void visualize_diagram(std::list<Voronoi::NewDiagram::FacePtr>& faces, const std
             sf::Texture texture;
             texture.create(window.getSize().x, window.getSize().y);
             texture.update(window);
-            std::string suffix = minKnapsack ? "_MKVD" : "_base";   // change if needed
-            std::string folder = "Images";
-            std::string fullPath = folder + "/" +  std::filesystem::path(fileName).stem().string() + suffix + ".png";
+            std::string suffix;
+            if (minKnapsack==0){
+                suffix="_base";    
+            }else if(minKnapsack==-1){
+                suffix="_MKVD";
+            }else{
+                suffix="_" + std::to_string(minKnapsack) + "_order";
+            }
+            std::string folder = "Images/" + std::filesystem::path(fileName).stem().string();
+            if (!std::filesystem::exists(folder)) {
+                std::filesystem::create_directory(folder);
+            }
+            std::string fullPath = folder + "/diagram" + suffix + ".png";
             texture.copyToImage().saveToFile(fullPath);
             saved = false;
         }

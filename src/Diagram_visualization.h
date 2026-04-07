@@ -29,6 +29,6 @@ void visualize_diagram(std::list<Voronoi::NewDiagram::FacePtr>& faces, std::vect
 
 void visualize_diagram(std::vector<RegionData>& regions, std::vector<Point2D>& points);
 
-void visualize_diagram(std::list<Voronoi::NewDiagram::FacePtr>& faces, const std::vector<std::pair<Point2D, double>>& points, bool saved, bool minKnapsack, std::string fileName);
+void visualize_diagram(std::list<Voronoi::NewDiagram::FacePtr>& faces, const std::vector<std::pair<Point2D, double>>& points, bool saved, int minKnapsack, std::string fileName);
 
 #endif
