@@ -4,20 +4,21 @@
 #define Diagram_visualization_h
 
 // My includes
+#include <optional>
 #include "Point2D.h"
 #include "NewDiagram.h"
 
 struct BoundaryElement {
     bool isRay;
 
-    // if segment
-    Point2D a, b;
+    // if it's a ray only one of the two points is significant, the other is just a placeholder
+    bool hasA;
+    bool hasB;
 
-    // if ray
-    Point2D origin;
+    Point2D a, b; // a is the tail and b is the head
 
-    Point2D rayDirection;     // for drawing
-    Point2D normalDirection;  // for inside test
+    Point2D direction;
+    Point2D geomDirection;
 };
 
 struct RegionData {

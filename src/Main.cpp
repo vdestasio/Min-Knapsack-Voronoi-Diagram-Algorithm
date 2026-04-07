@@ -102,8 +102,7 @@ void cleanupDiagram(Voronoi::NewDiagram& diagram) {
     diagram.getFaces().clear();
 }
 
-RegionData extractRegion(const Voronoi::NewDiagram::FacePtr& face)
-{
+RegionData extractRegion(const Voronoi::NewDiagram::FacePtr& face) {
     RegionData region;
 
     auto start = face->firstEdge;
@@ -111,38 +110,54 @@ RegionData extractRegion(const Voronoi::NewDiagram::FacePtr& face)
 
     // --- STEP 1: collect raw edges ---
     do {
+        auto s1 = e->label;
+        auto s2 = e->twin->label;
+
         auto tail = e->tail;
         auto head = e->head;
+        Point2D edgeDir;
+        Point2D geomDir;
+
+        geomDir = ((s2->point - s1->point).getRotated90CCW());
+        geomDir.normalize();
 
         // --- CASE 1: finite edge ---
         if (tail && head && !tail->infinite && !head->infinite) {
+            edgeDir = head->point - tail->point;
+            edgeDir.normalize();
+
             region.boundary.push_back({
-                false,
+                false, true, true,
                 tail->point,
                 head->point,
-                {},      // origin
-                {}, {},  // rayDirection, normalDirection
+                edgeDir,
+                geomDir
             });
         }
         else {
+
+            edgeDir = (s2->point - s1->point).getRotated90CCW();
+            edgeDir.normalize();
+            
             // --- CASE 2: infinite edge → ray ---
-            auto s1 = e->label;
-            auto s2 = e->twin ? e->twin->label : nullptr;
-
-            if (s1 && s2 && head && !head->infinite) {
-
-                Point2D origin = head->point;
-
-                // geometric direction (Voronoi edge)
-                Point2D rayDir = (s2->point - s1->point).getRotated90CCW();
-                rayDir.normalize();
-
+            if (head && !head->infinite) {
+                // ray goes TO head → so direction is backwards
                 region.boundary.push_back({
-                    true,
-                    {}, {},      // a, b
-                    origin,
-                    rayDir,      // for drawing
-                    {}           // normalDirection (to fill later)
+                    true, false, true,
+                    {},  
+                    head->point,        // head (finite endpoint)
+                    -edgeDir,
+                    geomDir
+                });
+            }
+            else if (tail && !tail->infinite) {
+                // ray starts at tail and goes forward
+                region.boundary.push_back({
+                    true, true, false,
+                    tail->point,        // tail (finite endpoint)
+                    {},  
+                    edgeDir,
+                    -geomDir
                 });
             }
         }
@@ -157,47 +172,6 @@ RegionData extractRegion(const Voronoi::NewDiagram::FacePtr& face)
 
     if (face->pivot)
         region.siteIndices.push_back(face->pivot->index);
-
-    // --- STEP 3: compute interior point ---
-    Point2D interior(0, 0);
-    int count = 0;
-
-    for (auto& s : face->sites) {
-        interior += s->point;
-        count++;
-    }
-
-    if (face->pivot) {
-        interior += face->pivot->point;
-        count++;
-    }
-
-    interior /= count;
-
-    // --- STEP 4: orient everything correctly ---
-    for (auto& edge : region.boundary) {
-
-        if (!edge.isRay) {
-            // --- segment ---
-            Point2D dir = edge.b - edge.a;
-
-            // ensure interior is on the "inside" side
-            if (crossProduct(dir, interior - edge.a) > 0) {
-                std::swap(edge.a, edge.b);
-            }
-        }
-        else {
-            // --- ray ---
-            Point2D normal = edge.rayDirection;
-
-            // orient normal so interior is inside
-            if (crossProduct(normal, interior - edge.origin) > 0) {
-                normal = -normal;
-            }
-
-            edge.normalDirection = normal;
-        }
-    }
 
     return region;
 }
@@ -239,6 +213,8 @@ void saveRegions(const std::list<Voronoi::NewDiagram::FacePtr>& faces, const std
 
         for (const auto& e : r.boundary) {
             writeBool(e.isRay);
+            writeBool(e.hasA);
+            writeBool(e.hasB);
 
             if (!e.isRay) {
                 // segment
@@ -246,10 +222,14 @@ void saveRegions(const std::list<Voronoi::NewDiagram::FacePtr>& faces, const std
                 writePoint(e.b);
             } else {
                 // ray
-                writePoint(e.origin);
-                writePoint(e.rayDirection);
-                writePoint(e.normalDirection);
+                if (e.hasA){
+                    writePoint(e.a);
+                }else if (e.hasB){
+                    writePoint(e.b);
+                }
             }
+            writePoint(e.direction);
+            writePoint(e.geomDirection);
         }
 
         // ===== site indices =====

@@ -67,6 +67,11 @@ void loadRegions(const std::string& filename, std::vector<RegionData>& regions) 
             readBool(isRay);
 
             regions[i].boundary[j].isRay = isRay;
+            bool hasA, hasB;
+            readBool(hasA);
+            readBool(hasB);
+            regions[i].boundary[j].hasA = hasA;
+            regions[i].boundary[j].hasB = hasB;
 
             if (!isRay) {
                 // segment
@@ -74,10 +79,14 @@ void loadRegions(const std::string& filename, std::vector<RegionData>& regions) 
                 readPoint(regions[i].boundary[j].b);
             } else {
                 // ray
-                readPoint(regions[i].boundary[j].origin);
-                readPoint(regions[i].boundary[j].rayDirection);
-                readPoint(regions[i].boundary[j].normalDirection);
+                if (hasA){
+                    readPoint(regions[i].boundary[j].a);
+                }else if (hasB){
+                    readPoint(regions[i].boundary[j].b);
+                }
             }
+            readPoint(regions[i].boundary[j].direction);
+            readPoint(regions[i].boundary[j].geomDirection);
         }
 
         // ===== site indices =====
@@ -196,10 +205,24 @@ double edge_constraint(unsigned /*n*/, const double* x, double* /*grad*/, void* 
 
     if (!e->isRay) {
         Point2D dir = e->b - e->a;
+
         return crossProduct(dir, X - e->a);  // ≤ 0 inside
-    } else {
-        // use rayDirection, NOT normalDirection
-        return crossProduct(e->rayDirection, X - e->origin);  // ≤ 0 inside
+    } 
+    else {
+        // pick the finite endpoint of the ray
+        Point2D origin = e->hasA ? e->a : e->b;
+
+        // 1) half-plane constraint (same logic as edges)
+        double c = crossProduct(e->direction, X - origin);
+
+        // 2) ensure point is in the forward direction of the ray
+        double d = dotProduct(e->direction, X - origin);
+
+        // enforce BOTH:
+        // cross <= 0 --> ensures the point is on the interior side of the boundary line 
+        // dot >= 0 --> ensures the point isin front of the ray, not behind the finite endpoint
+
+        return std::min(c, d);
     }
 }
 
@@ -253,22 +276,20 @@ bool isInsideRegion(const RegionData& r, const Point2D& x) {
     //               << "(" << edge.b.x << "," << edge.b.y << ")\n";
     // } else {
     //     std::cout << "Ray from (" << edge.origin.x << "," << edge.origin.y << ") dir ("
-    //               << edge.rayDirection.x << "," << edge.rayDirection.y << ")\n";
+    //               << edge.direction.x << "," << edge.direction.y << ")\n";
     // }
     // }
 
     for (const auto& edge : r.boundary) {
-
+        Point2D A;
         if (!edge.isRay) {
-            Point2D dir = edge.b - edge.a;
-            if (crossProduct(dir, x - edge.a) > eps){
-                return false;
-            }
+            A = edge.a;
+        } else {
+            if (edge.hasA) A = edge.a;
+            else A = edge.b;
         }
-        else {
-            if (crossProduct(edge.normalDirection, x - edge.origin) > eps){
-                return false;
-            }
+        if (crossProduct(edge.direction, x - A) > eps){
+            return false;
         }   
     }
     return true;
@@ -370,12 +391,25 @@ int main(int argc, char* argv[]) {
     bool check_inside = false;
     bool save_local_optima = false;
 
+    
+
     // For each region find the corresponding solution with weiszfeld and check if it's inside the region,
     // if it is, compute the cost of that solution and add it to the local optima
     // if the local optima is the smallest one, update the global optimum
     for (auto& r : regions) {
+
+        for (const auto& e : r.boundary) {
+            if (!std::isfinite(e.direction.x) || !std::isfinite(e.direction.y)) {
+                std::cout << "Invalid direction detected\n";
+                exit(1);
+            }
+        }
         save_local_optima = false;
         std::vector<Point2D> tmp_sites;
+        if (r.siteIndices.empty()){
+            std::cout << "Region with no sites, skipping...\n";
+            continue;
+        }
         for (const auto& s : r.siteIndices){
             tmp_sites.push_back(sitePoints[s]);
         }

@@ -77,10 +77,12 @@ void initEdgePointsVis(Voronoi::NewDiagram::HalfEdgePtr& h, sf::VertexArray& lin
 }
 
 void appendRegionEdges(const RegionData& r, sf::VertexArray& allEdges){
+    allEdges.setPrimitiveType(sf::Lines);
+
     for (const auto& e : r.boundary) {
 
         if (!e.isRay) {
-            // --- segment ---
+            // segment
             allEdges.append(sf::Vertex(
                 sf::Vector2f(e.a.x, e.a.y), sf::Color::Green));
 
@@ -88,13 +90,11 @@ void appendRegionEdges(const RegionData& r, sf::VertexArray& allEdges){
                 sf::Vector2f(e.b.x, e.b.y), sf::Color::Green));
         }
         else {
-            // --- ray ---
-            Point2D origin = e.origin;
-            Point2D dir = e.rayDirection;
+            Point2D origin = e.hasA ? e.a : e.b;
+            Point2D dir = e.geomDirection;
 
-            dir.normalize(); // safety
+            double length = 100.0; 
 
-            double length = 100.0;
             Point2D end = origin + dir * length;
 
             allEdges.append(sf::Vertex(

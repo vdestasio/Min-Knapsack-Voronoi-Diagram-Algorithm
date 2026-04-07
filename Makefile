@@ -13,8 +13,9 @@ FILE = Data/equilatero_norm.txt
 #FILE = Data/hardest_one.txt # OK! The closed regions is completely partitioned in order-2 regions 
 #FILE = Data/hardest_one_perturbated.txt 
 #FILE = Data/Lee_fig2.txt # OK! Since I need exactly all points all regions get fused together and I get no region at all
+# BUT it terminates badly, probably when I traverse the regions since they are actually only one. I should check
 #FILE = Data/best_example.txt
-FILE = Data/easy_case.txt
+#FILE = Data/easy_case.txt
 #FILE = Data/Lee_fig2_easier.txt
 
 
@@ -58,7 +59,7 @@ run: $(OUT)
 	./$(OUT) --file $(FILE) --visualize 0 --minKnapsack 1 --save_diagram 1 --save_final 0 --save_each_step 0
 
 lpc: $(OUT_LPC)
-	./$(OUT_LPC) --file $(FILE) --weiszfeld_method 1
+	./$(OUT_LPC) --file $(FILE) --weiszfeld_method 0
 
 base: $(OUT)
 	./$(OUT) --file $(FILE) --visualize 1 --minKnapsack 0
