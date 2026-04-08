@@ -97,21 +97,24 @@ void loadRegions(const std::string& filename, std::vector<RegionData>& regions) 
         for (size_t j = 0; j < nS; ++j) {
             readSize(regions[i].siteIndices[j]);
         }
+        readBool(regions[i].hasPivot);
     }
 
     in.close();
 }
 
-double valueFunction(const Point2D& x, const std::vector<size_t>& siteIndices, const std::vector<Point2D>& sitePoints, const std::vector<double>& siteCaps, double capacity) {
+double valueFunction(const Point2D& x, const std::vector<size_t>& siteIndices, const std::vector<Point2D>& sitePoints, const std::vector<double>& siteCaps, double capacity, bool hasPivot) {
     double value = 0.0;
-    for (size_t idx : siteIndices) {
+    double total_served = 0.0;
+    for (size_t i = 0 ; i < siteIndices.size(); ++i) {
+        size_t idx = siteIndices[i];
         double d = hypot(x.x - sitePoints[idx].x, x.y - sitePoints[idx].y);
-        if (capacity < siteCaps[idx]) {
-            value += (capacity) * d;
+        if (hasPivot && i == siteIndices.size() - 1) {
+            value += (capacity- total_served) * d;
         }else{
             value += siteCaps[idx] * d;
         }
-        capacity -= siteCaps[idx];
+        total_served += siteCaps[idx];
     }
 
     return value;
@@ -226,10 +229,19 @@ double edge_constraint(unsigned /*n*/, const double* x, double* /*grad*/, void* 
     }
 }
 
-Point2D solveNLP(const RegionData& region, const std::vector<Point2D>& pts, const std::vector<double>& weights, Point2D x0) {
+Point2D solveNLP(const RegionData& region, const std::vector<Point2D>& pts, const std::vector<double>& weights, double capacity, bool hasPivot, Point2D x0) {
     nlopt_opt opt = nlopt_create(NLOPT_LN_COBYLA, 2);
+    auto copy_weights = weights;
 
-    auto ctx = std::make_pair(&pts, &weights);
+    if (hasPivot){
+        double total_served = 0.0;
+        for (size_t i = 0 ; i < pts.size() - 1; ++i) {
+            total_served += weights[i];
+        }
+        copy_weights[weights.size() - 1] = (capacity - total_served);
+    }
+
+    auto ctx = std::make_pair(&pts, &copy_weights);
 
     nlopt_set_min_objective(opt, objective, &ctx);
     nlopt_set_xtol_rel(opt, 1e-6);
@@ -288,6 +300,7 @@ bool isInsideRegion(const RegionData& r, const Point2D& x) {
             if (edge.hasA) A = edge.a;
             else A = edge.b;
         }
+        // If this is higher than 0 then the point is on the left of the edge, i.e. outside!!
         if (crossProduct(edge.direction, x - A) > eps){
             return false;
         }   
@@ -374,7 +387,7 @@ int main(int argc, char* argv[]) {
         }
         x0 /= (double)sitePoints.size();
         Point2D sol = weiszfeld(sitePoints, siteCaps, x0);
-        double sol_cost = valueFunction(sol, std::vector<size_t>(sitePoints.size()), sitePoints, siteCaps, capacity);
+        double sol_cost = valueFunction(sol, std::vector<size_t>(sitePoints.size()), sitePoints, siteCaps, capacity, false);
         std::cout << "Weiszfeld solution: " << sol << " with cost: " << sol_cost << "\n";
         return 0;
     }
@@ -397,19 +410,10 @@ int main(int argc, char* argv[]) {
     // if it is, compute the cost of that solution and add it to the local optima
     // if the local optima is the smallest one, update the global optimum
     for (auto& r : regions) {
-
-        for (const auto& e : r.boundary) {
-            if (!std::isfinite(e.direction.x) || !std::isfinite(e.direction.y)) {
-                std::cout << "Invalid direction detected\n";
-                exit(1);
-            }
-        }
         save_local_optima = false;
         std::vector<Point2D> tmp_sites;
-        if (r.siteIndices.empty()){
-            std::cout << "Region with no sites, skipping...\n";
-            continue;
-        }
+        bool hasPivot = r.hasPivot;
+
         for (const auto& s : r.siteIndices){
             tmp_sites.push_back(sitePoints[s]);
         }
@@ -444,7 +448,8 @@ int main(int argc, char* argv[]) {
             std::cout << "Weiszfeld solution: " << sol << "\n";
             check_inside = true;
         }else {
-            sol = solveNLP(r, tmp_sites, siteCaps, x0);
+            
+            sol = solveNLP(r, tmp_sites, siteCaps,capacity, hasPivot, x0);
             std::cout << "PNL solver solution: " << sol << "\n";
             if (std::isnan(sol.x) || std::isnan(sol.y)) {
                 std::cout << "NLP solver failed to find a solution";
@@ -457,7 +462,8 @@ int main(int argc, char* argv[]) {
             save_local_optima = true;
         }
         if (save_local_optima){
-            double cost = valueFunction(sol,r.siteIndices, sitePoints, siteCaps, capacity);
+
+            double cost = valueFunction(sol,r.siteIndices, sitePoints, siteCaps, capacity, hasPivot);
             local_optima.push_back(sol);
             local_optima_cost.push_back(cost); 
             local_optima_sites.push_back(tmp_sites);

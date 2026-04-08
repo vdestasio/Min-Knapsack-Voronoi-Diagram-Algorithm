@@ -24,7 +24,7 @@ FILE = Data/equilatero_norm.txt
 #FILE = Data/example_1.txt 
 #FILE = Data/example_2.txt
 #FILE = Data/Lee_fig2_2.txt
-#FILE = Data/Lee_2.txt
+FILE = Data/Lee_2.txt
 
 # Probably degenerates cases (like cocircular points or collinear points) that I don't know how to handle yet
 #FILE = Data/degenerate_1.txt 

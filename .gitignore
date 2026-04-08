@@ -1,4 +1,5 @@
 myProgram
 lpcProgram
-.vscode/*
+.vscode/
 comparison.cpp
+log.txt

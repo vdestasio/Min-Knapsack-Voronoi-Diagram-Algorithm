@@ -170,8 +170,10 @@ RegionData extractRegion(const Voronoi::NewDiagram::FacePtr& face) {
     for (auto& s : face->sites)
         region.siteIndices.push_back(s->index);
 
-    if (face->pivot)
+    if (face->pivot){
         region.siteIndices.push_back(face->pivot->index);
+        region.hasPivot = true;
+    }
 
     return region;
 }
@@ -238,6 +240,7 @@ void saveRegions(const std::list<Voronoi::NewDiagram::FacePtr>& faces, const std
         for (size_t idx : r.siteIndices) {
             writeSize(idx);
         }
+        writeBool(r.hasPivot);
     }
 
     out.close();

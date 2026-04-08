@@ -17,13 +17,15 @@ struct BoundaryElement {
 
     Point2D a, b; // a is the tail and b is the head
 
-    Point2D direction;
-    Point2D geomDirection;
+    // both are normalized
+    Point2D direction; // point along the edge or in the outward direction of the ray
+    Point2D geomDirection; // point inside the region, perpendicular to direction
 };
 
 struct RegionData {
     std::vector<BoundaryElement> boundary;  // ORDERED (clockwise)
     std::vector<size_t> siteIndices;
+    bool hasPivot;
 };
 
 void visualize_diagram(std::list<Voronoi::NewDiagram::FacePtr>& faces, std::vector<std::pair<Point2D, double>>& points);
