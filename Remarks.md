@@ -1,4 +1,4 @@
-# MinKnapsack algorithm
+[19/04/2026 17:29] Vale: # MinKnapsack algorithm
 
 This file contains all the decisions taken to implement the algorithm and all the problems that I met along the way.
 
@@ -31,9 +31,7 @@ Since it breaks both with Min-Knapsack diagrams and k-order diagrams this proble
 Objective: I should for sure be able to recover a k-order diagram for any order! Most probable correction is to use the heap to be sure to divide the regions with multiple labels in the correct order. I also should correct the computation of the distance since it seems now that the plus distance of a vertex and the minus distance of the subsequent vertex do not concide, which is clearly not possible! I should also reconsider the check for the point to be inside the diagram (but maybe by starting always from the most close ones that outcome is avoided too). I should also be careful with the vertex on the infinite, should it always be the last to be connected or not? What did I wrote about it in the thesis?
 
 Possible idea too: use CGAL library to check how a correct order should be. I could take the 100 points example, make each point weight 2 so that I need exactly 50 points and check if the 50-order diagram is actually computed.
-
-
-## What should happen for each example
+[19/04/2026 17:29] Vale: ## What should happen for each example
 - equilatero_norm &#8594; 3 points, I need exactly 2 to satisfy the request. I expect to see all regions of order 2.
 - four_points &#8594; 4 points, I need exactly 2 to satisfy the request. I expect to see all regions of order 2.
 - example_3 &#8594; 3 points, only one is able to satisfy by itself (the one in the bottom part), for all others I need multiple points. I expect 1 region of order 1 and all others of order 2. Since the points together have NOT the same weight I want to keep their order.
@@ -48,7 +46,6 @@ Possible idea too: use CGAL library to check how a correct order should be. I co
 
 ## Temporary debugging prints:
 To print the Voronoi diagram output of Fortune algorithm:
-```c++
 auto& hs = diagram.getHalfEdges();
 for (const auto& he : hs) {
     std::cout << "Head: ";
@@ -66,9 +63,7 @@ for (const auto& he : hs) {
         std::cout << he.origin->point << "\n";
     }
 }
-```
 To print the Voronoi diagram after the "translation":
-```c++
 std::cout << "MODIFIED STRUCTURE\n";
 auto& fs = newDiagram.getFaces();
 for (const auto& face : fs) {
@@ -89,32 +84,25 @@ for (const auto& face : fs) {
         x = x->next;
     } while (x != face->firstEdge);
 }
-```
 
 
 
 ## Compile commands
-```bash
 g++ -std=c++17 -IMyGAL/include Main.cpp MinKnapsack.cpp Point2D.cpp -o MyProgram -lsfml-graphics -lsfml-window -lsfml-system; ./MyProgram
-```
 
-**GDB debugger** compilation/execution:
-```bash
+GDB debugger compilation/execution:
 g++ -g -std=c++17 -IMyGAL/include Main.cpp MinKnapsack.cpp Point2D.cpp -o MyProgram -lsfml-graphics -lsfml-window -lsfml-system; gdb ./MyProgram
 
 run
 bt
 
-```
 
-**Valgrind** compilation/execution:
+Valgrind compilation/execution:
 
-```bash
 g++ -g -fno-omit-frame-pointer -IMyGAL/include Main.cpp MinKnapsack.cpp Point2D.cpp -o MyProgram -lsfml-graphics -lsfml-window -lsfml-system; valgrind --track-origins=yes --leak-check=full --show-leak-kinds=all ./MyProgram 
-```
 
 
-**CGAL comparison**
+CGAL comparison
 g++ main.cpp -lCGAL -lgmp -lmpfr -O3 -std=c++17
 
 ./a.out 3
@@ -129,8 +117,7 @@ def are_cocircular(p1, p2, p3, p4):
     # Determinant test for cocircularity
     # | x  y  x²+y²  1 |
     # determinant == 0 → cocircular
-
-    def row(p):
+[19/04/2026 17:29] Vale: def row(p):
         x, y = p
         return [x, y, x*x + y*y, 1]
 
@@ -225,3 +212,59 @@ def generate_file(filename="points.txt", num_points=100):
             f.write(f"{x:.6f} {y:.6f} {w}\n")
 
 
+# To check cocircularity
+
+import itertools
+
+def read_points(filename):
+    points = []
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+        
+        # Skip first two lines (metadata)
+        for line in lines[2:]:
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                x = float(parts[0])
+                y = float(parts[1])
+                points.append((x, y))
+    
+    return points
+
+
+def determinant4(a, b, c, d):
+    # Each point: (x, y)
+    def row(p):
+        x, y = p
+        return [x, y, x*x + y*y, 1]
+    
+    mat = [row(a), row(b), row(c), row(d)]
+    
+    # Compute determinant manually (expansion or using helper)
+    import numpy as np
+    return np.linalg.det(mat)
+
+
+def are_cocircular(a, b, c, d, eps=1e-7):
+    det = determinant4(a, b, c, d)
+    return abs(det) < eps
+
+
+def check_no_cocircular(points):
+    for quad in itertools.combinations(points, 4):
+        if are_cocircular(*quad):
+            print("Found cocircular points:", quad)
+            return False
+    return True
+
+
+if name == "main":
+    filename = "points.txt"
+    points = read_points(filename)
+    
+    print(f"Loaded {len(points)} points")
+    
+    if check_no_cocircular(points):
+        print("OK! No four cocircular points found")
+    else:
+        print("NO! There exist four cocircular points")

@@ -14,7 +14,7 @@ FILE = Data/equilatero_norm.txt
 #FILE = Data/hardest_one_perturbated.txt 
 #FILE = Data/Lee_fig2.txt # OK! Since I need exactly all points all regions get fused together and I get no region at all
 # BUT it terminates badly, probably when I traverse the regions since they are actually only one. I should check
-#FILE = Data/best_example.txt
+FILE = Data/best_example.txt
 #FILE = Data/easy_case.txt
 #FILE = Data/Lee_fig2_easier.txt
 
@@ -32,13 +32,14 @@ FILE = Data/equilatero_norm.txt
 # then I have regions of VERY high order and it breaks...
 # these first 3 works if I use capacity of 50 but breaks if higher
 #FILE = Data/ten_points.txt
+#FILE = Data/ten_points_ten_order.txt
 #FILE = Data/twenty_points.txt
 #FILE = Data/thirty_points.txt
 
+
+# They all don't work!
 #FILE = Data/fifty_points.txt
 #FILE = Data/hundred_points.txt
-# They all don't work!
-#FILE = Data/ten_points_ten_order.txt
 #FILE = Data/twenty_points_twenty_order.txt
 #FILE = Data/thirty_points_thirty_order.txt
 #FILE = Data/fifty_points_fifty_order.txt

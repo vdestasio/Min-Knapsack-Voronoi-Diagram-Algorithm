@@ -248,6 +248,119 @@ bool pointInsideRegion(Point2D p, Point2D p1, Point2D p2) {
         >= ((p.y - p1.y) * (p2.x - p1.x)));
 }
 
+double signedDistanceToRegion(
+    Point2D p,
+    const std::vector<Point2D>& v,
+    bool isOpen,
+    const Point2D& startV,
+    const Point2D& endV)
+{
+    const double eps = 1e-9;
+    int n = v.size();
+    if (n < 2) return -1e18;
+
+    int startIdx = -1, endIdx = -1;
+
+    for (int i = 0; i < n; ++i) {
+        if ((v[i] - startV).norm() < eps) startIdx = i;
+        if ((v[i] - endV).norm() < eps) endIdx = i;
+    }
+
+    if (startIdx == -1 || endIdx == -1)
+        return -1e18;
+
+    auto pointSegmentDistance = [&](const Point2D& A, const Point2D& B) {
+        Point2D AB = B - A;
+        Point2D AP = p - A;
+
+        double denom = AB.norm2();
+        if (denom < eps) return (p - A).norm();
+
+        double t = dotProduct(AP, AB) / denom;
+        t = std::max(0.0, std::min(1.0, t));
+
+        Point2D closest = A + AB * t;
+        return (p - closest).norm();
+    };
+
+    double minDist = 1e18;
+
+    int i = startIdx;
+
+    while (true) {
+        int next = (i + 1) % n;
+
+        // distance to current edge
+        if (i != n - 1) {
+            minDist = std::min(minDist,
+                pointSegmentDistance(v[i], v[i + 1]));
+        }
+        else if (!isOpen) {
+            // closing edge only if region is closed
+            minDist = std::min(minDist,
+                pointSegmentDistance(v[n - 1], v[0]));
+        }
+
+        if (next == endIdx)
+            break;
+
+        i = next;
+    }
+
+    return minDist;
+}
+
+bool pointInsideRegion(Point2D p, const std::vector<Point2D>& v, bool isOpen, Voronoi::NewDiagram::SitePtr startL, Voronoi::NewDiagram::SitePtr startR, Voronoi::NewDiagram::SitePtr endL,   Voronoi::NewDiagram::SitePtr endR){
+    const double eps = 1e-9;
+    int n = v.size();
+    if (n < 2) return false;
+
+    // --- finite edges ---
+    for (int i = 0; i < n - 1; ++i) {
+        Point2D A = v[i];
+        Point2D B = v[i + 1];
+
+        if (crossProduct(B - A, p - A) > eps)
+            return false;
+    }
+
+    if (!isOpen) {
+        if (crossProduct(v[0] - v[n-1], p - v[n-1]) > eps)
+            return false;
+        return true;
+    }
+
+    // --- start infinite edge ---
+    {
+        Point2D A = v.front();
+
+        Point2D SL = startL->point;
+        Point2D SR = startR->point;
+        Point2D dir = (SL - SR).getRotated90CCW();
+        dir.normalize();
+
+        
+        if (crossProduct(dir, p - A) > eps)
+            return false;
+    }
+
+    // --- end infinite edge ---
+    {
+        Point2D A = v.back();
+
+        Point2D SL = endL->point;
+        Point2D SR = endR->point;
+
+        Point2D dir = (SL - SR).getRotated90CCW();
+        dir.normalize();
+
+        if (crossProduct(dir, p - A) > eps)
+            return false;
+    }
+
+    return true;
+}
+
 void chooseDirection(Special_vertex* r) {
     r->direz = EQUAL;
     const double eps = 1e-9;  // tolerance for floating-point comparison
@@ -431,6 +544,28 @@ void partition(Voronoi::NewDiagram::FacePtr& r_ptr, std::list<Voronoi::NewDiagra
     auto lambda = std::vector<Voronoi::NewDiagram::SitePtr>();
     auto reg = std::vector<Voronoi::NewDiagram::FacePtr>();
 
+    std::vector<Point2D> v;
+    Voronoi::NewDiagram::SitePtr startL;
+    Voronoi::NewDiagram::SitePtr startR;
+    Voronoi::NewDiagram::SitePtr endL;
+    Voronoi::NewDiagram::SitePtr endR;
+    for (auto e = r.firstEdge; ; e = e->next) {
+        if (!e->head->infinite){
+            v.push_back(e->head->point);
+        }else{
+            std::cout << "Open: true\n";
+            endR = e->label;
+            endL = e->twin->label;
+            startR = e->next->label;
+            startL = e->next->twin->label;
+        }
+        if (e->next == r.firstEdge) break;
+    }
+    for (int i = 0; i < v.size(); i++) {
+    std::cout << i << ": " << v[i] << "\n";
+}
+
+
     e.push_back(r.firstEdge);
     lambda.push_back(e.at(0)->twin->label);
     reg.push_back(createRegion(R, r_ptr, lambda.at(0), e.at(0)));
@@ -527,6 +662,7 @@ void partition(Voronoi::NewDiagram::FacePtr& r_ptr, std::list<Voronoi::NewDiagra
                 }
                 //std::cout << "Region defined by points: " << firstPoint << ", " << secondPoint << "\n";
                 //std::cout << "Circumcenter inside region: " << pointInsideRegion(P, firstPoint, secondPoint) << "\n";
+                //pointInsideRegion(P, v, open, startL, startR, endL, endR)
                 if (pointInsideRegion(P, firstPoint, secondPoint)) {
                     if (!L[l_iter].edgeout->tail->infinite) {
                         L[l_iter].d_plus = dist(P, L[l_iter].edgeout->tail->point);

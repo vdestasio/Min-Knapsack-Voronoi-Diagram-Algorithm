@@ -282,16 +282,6 @@ Point2D solveNLP(const RegionData& region, const std::vector<Point2D>& pts, cons
 
 bool isInsideRegion(const RegionData& r, const Point2D& x) {
     const double eps = 1e-9;
-    // for (const auto& edge : r.boundary) {
-    // if (!edge.isRay) {
-    //     std::cout << "Edge: (" << edge.a.x << "," << edge.a.y << ") -> "
-    //               << "(" << edge.b.x << "," << edge.b.y << ")\n";
-    // } else {
-    //     std::cout << "Ray from (" << edge.origin.x << "," << edge.origin.y << ") dir ("
-    //               << edge.direction.x << "," << edge.direction.y << ")\n";
-    // }
-    // }
-
     for (const auto& edge : r.boundary) {
         Point2D A;
         if (!edge.isRay) {
