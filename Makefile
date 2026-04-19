@@ -18,13 +18,32 @@ FILE = Data/equilatero_norm.txt
 #FILE = Data/easy_case.txt
 #FILE = Data/Lee_fig2_easier.txt
 
-
 # I don't know the ground truth for these ones
 #FILE = Data/hard_case.txt
 #FILE = Data/example_1.txt 
 #FILE = Data/example_2.txt
 #FILE = Data/Lee_fig2_2.txt
-FILE = Data/Lee_2.txt
+#FILE = Data/Lee_2.txt
+
+
+
+# Breaks... maybe I do really need the heap
+# It works if the total capacity is for maximum around 6 points, but if I increase the capacity
+# then I have regions of VERY high order and it breaks...
+# these first 3 works if I use capacity of 50 but breaks if higher
+#FILE = Data/ten_points.txt
+#FILE = Data/twenty_points.txt
+#FILE = Data/thirty_points.txt
+
+#FILE = Data/fifty_points.txt
+#FILE = Data/hundred_points.txt
+# They all don't work!
+#FILE = Data/ten_points_ten_order.txt
+#FILE = Data/twenty_points_twenty_order.txt
+#FILE = Data/thirty_points_thirty_order.txt
+#FILE = Data/fifty_points_fifty_order.txt
+#FILE = Data/hundred_points_hundred_order.txt
+
 
 # Probably degenerates cases (like cocircular points or collinear points) that I don't know how to handle yet
 #FILE = Data/degenerate_1.txt 
@@ -56,7 +75,7 @@ debug_build: CFLAGS += $(DEBUG_FLAGS)
 debug_build: $(OUT)
 
 run: $(OUT)
-	./$(OUT) --file $(FILE) --visualize 0 --minKnapsack 1 --save_diagram 1 --save_final 0 --save_each_step 0
+	./$(OUT) --file $(FILE) --visualize 1 --minKnapsack 1 --save_diagram 0 --save_final 0 --save_each_step 0
 
 lpc: $(OUT_LPC)
 	./$(OUT_LPC) --file $(FILE) --weiszfeld_method 0
